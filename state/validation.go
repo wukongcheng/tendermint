@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"encoding/hex"
+	"strconv"
 
 	"github.com/tendermint/tendermint/crypto"
 	dbm "github.com/tendermint/tendermint/libs/db"
@@ -13,19 +15,27 @@ import (
 //-----------------------------------------------------
 // Validate block
 
-func validateBlock(stateDB dbm.DB, state State, block *types.Block) error {
+func validateBlock(metrics *Metrics, stateDB dbm.DB, evpool EvidencePool, state State, block *types.Block) error {
 	// Validate internal consistency.
 	if err := block.ValidateBasic(); err != nil {
 		return err
 	}
 
 	// Validate basic info.
-	if block.Version != state.Version.Consensus {
-		return fmt.Errorf("Wrong Block.Header.Version. Expected %v, got %v",
-			state.Version.Consensus,
-			block.Version,
+	//if block.Version != state.Version.Consensus {
+	//	return fmt.Errorf("Wrong Block.Header.Version. Expected %v, got %v",
+	//		state.Version.Consensus,
+	//		block.Version,
+	//	)
+	//}
+
+	if block.Version.Block != state.Version.Consensus.Block {
+		return fmt.Errorf("Wrong Block.Header.Version.Block Expected %v, got %v",
+			state.Version.Consensus.Block,
+			block.Version.Block,
 		)
 	}
+
 	if block.ChainID != state.ChainID {
 		return fmt.Errorf("Wrong Block.Header.ChainID. Expected %v, got %v",
 			state.ChainID,
@@ -57,6 +67,7 @@ func validateBlock(stateDB dbm.DB, state State, block *types.Block) error {
 
 	// Validate app info
 	if !bytes.Equal(block.AppHash, state.AppHash) {
+		metrics.AppHashConflict.With("proposer", block.ProposerAddress.String(), "height", strconv.FormatInt(block.Height, 10)).Add(float64(1))
 		return fmt.Errorf("Wrong Block.Header.AppHash.  Expected %X, got %v",
 			state.AppHash,
 			block.AppHash,
@@ -139,11 +150,24 @@ func validateBlock(stateDB dbm.DB, state State, block *types.Block) error {
 		return types.NewErrEvidenceOverflow(maxEvidenceBytes, evidenceBytes)
 	}
 
+	// key = hex(evidence.Hash())
+	// value = evidence.String()
+	evMap := make(map[string]bool)
+
 	// Validate all evidence.
 	for _, ev := range block.Evidence.Evidence {
+		if _, ok := evMap[hex.EncodeToString(ev.Hash())]; ok {
+			err := errors.New("repeated evidence")
+			return types.NewErrEvidenceInvalid(ev, err)
+		}
+		if evpool != nil && evpool.IsCommitted(ev) {
+			err := errors.New("evidence was already committed")
+			return types.NewErrEvidenceInvalid(ev, err)
+		}
 		if err := VerifyEvidence(stateDB, state, ev); err != nil {
 			return types.NewErrEvidenceInvalid(ev, err)
 		}
+		evMap[hex.EncodeToString(ev.Hash())] = true
 	}
 
 	// NOTE: We can't actually verify it's the right proposer because we dont

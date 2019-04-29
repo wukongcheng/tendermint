@@ -9,6 +9,7 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/state/txindex/null"
 	"github.com/tendermint/tendermint/types"
+	"github.com/pkg/errors"
 )
 
 // Tx allows you to query the transaction results. `nil` could mean the
@@ -193,12 +194,12 @@ func TxSearch(query string, prove bool, page, perPage int) (*ctypes.ResultTxSear
 		return nil, err
 	}
 
-	results, err := txIndexer.Search(q)
+	hashes, err := txIndexer.Search(q)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount := len(results)
+	totalCount := len(hashes)
 	perPage = validatePerPage(perPage)
 	page = validatePage(page, perPage, totalCount)
 	skipCount := (page - 1) * perPage
@@ -206,7 +207,11 @@ func TxSearch(query string, prove bool, page, perPage int) (*ctypes.ResultTxSear
 	apiResults := make([]*ctypes.ResultTx, cmn.MinInt(perPage, totalCount-skipCount))
 	var proof types.TxProof
 	for i := 0; i < len(apiResults); i++ {
-		r := results[skipCount+i]
+		h := hashes[skipCount+i]
+		r, err := txIndexer.Get(h)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get Tx{%X}", h)
+		}
 		height := r.Height
 		index := r.Index
 

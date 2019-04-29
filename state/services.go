@@ -74,6 +74,7 @@ type BlockStoreRPC interface {
 type BlockStore interface {
 	BlockStoreRPC
 	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit)
+	RetreatLastBlock()
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -84,6 +85,7 @@ type EvidencePool interface {
 	PendingEvidence(int64) []types.Evidence
 	AddEvidence(types.Evidence) error
 	Update(*types.Block, State)
+	IsCommitted(types.Evidence) bool
 }
 
 // MockMempool is an empty implementation of a Mempool, useful for testing.
@@ -92,3 +94,4 @@ type MockEvidencePool struct{}
 func (m MockEvidencePool) PendingEvidence(int64) []types.Evidence { return nil }
 func (m MockEvidencePool) AddEvidence(types.Evidence) error       { return nil }
 func (m MockEvidencePool) Update(*types.Block, State)             {}
+func (m MockEvidencePool) IsCommitted(types.Evidence) bool        {return false}

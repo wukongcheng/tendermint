@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,13 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
+)
+
+const (
+	HaltTagKey   = "halt_blockchain"
+	HaltTagValue = "true"
+	UpgradeFailureTagKey = "upgrade_failure"
+
 )
 
 //-----------------------------------------------------------------------------
@@ -78,7 +86,7 @@ func (blockExec *BlockExecutor) SetEventBus(eventBus types.BlockEventPublisher) 
 // Validation does not mutate state, but does require historical information from the stateDB,
 // ie. to verify evidence from a validator at an old height.
 func (blockExec *BlockExecutor) ValidateBlock(state State, block *types.Block) error {
-	return validateBlock(blockExec.db, state, block)
+	return validateBlock(blockExec.metrics, blockExec.db, blockExec.evpool, state, block)
 }
 
 // ApplyBlock validates the block against the state, executes it against the app,
@@ -101,6 +109,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	}
 
 	fail.Fail() // XXX
+	preState := state.Copy()
 
 	// Save the results before we commit.
 	saveABCIResponses(blockExec.db, block.Height, abciResponses)
@@ -127,6 +136,10 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 		return state, fmt.Errorf("Commit failed for application: %v", err)
 	}
 
+	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Tags, HaltTagKey); ok && bytes.Equal(tag.Value, []byte(HaltTagValue)) {
+		state.Deprecated = true
+	}
+
 	// Lock mempool, commit app state, update mempoool.
 	appHash, err := blockExec.Commit(state, block)
 	if err != nil {
@@ -141,6 +154,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	// Update the app hash and save the state.
 	state.AppHash = appHash
 	SaveState(blockExec.db, state)
+	SavePreState(blockExec.db, preState)
 
 	fail.Fail() // XXX
 
@@ -190,6 +204,7 @@ func (blockExec *BlockExecutor) Commit(
 		"appHash", fmt.Sprintf("%X", res.Data),
 	)
 
+	startTime := time.Now().UnixNano()
 	// Update mempool.
 	err = blockExec.mempool.Update(
 		block.Height,
@@ -197,6 +212,8 @@ func (blockExec *BlockExecutor) Commit(
 		TxPreCheck(state),
 		TxPostCheck(state),
 	)
+	endTime := time.Now().UnixNano()
+	blockExec.metrics.RecheckTime.Observe(float64(endTime-startTime) / 1000000)
 
 	return res.Data, err
 }
@@ -268,12 +285,27 @@ func execBlockOnProxyApp(
 		return nil, err
 	}
 
+
+	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Tags, UpgradeFailureTagKey); ok{
+		return nil, fmt.Errorf(string(tag.Value))
+	}
+
 	logger.Info("Executed block", "height", block.Height, "validTxs", validTxs, "invalidTxs", invalidTxs)
 
 	return abciResponses, nil
 }
 
 func getBeginBlockValidatorInfo(block *types.Block, lastValSet *types.ValidatorSet, stateDB dbm.DB) (abci.LastCommitInfo, []abci.Evidence) {
+
+	state := LoadState(stateDB)
+	// For replaying blocks, load history validator set
+	if block.Height > 1 && block.Height != state.LastBlockHeight + 1 {
+		var err error
+		lastValSet, err = LoadValidators(stateDB, block.Height - 1)
+		if err != nil {
+			panic(fmt.Sprintf("failed to load validatorset at heith %d", state.LastBlockHeight))
+		}
+	}
 
 	// Sanity check that commit length matches validator set size -
 	// only applies after first block

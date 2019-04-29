@@ -5,8 +5,7 @@ import (
 	"reflect"
 	"time"
 
-	amino "github.com/tendermint/go-amino"
-	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/libs/clist"
 	"github.com/tendermint/tendermint/libs/log"
 
@@ -18,8 +17,9 @@ import (
 const (
 	MempoolChannel = byte(0x30)
 
-	maxMsgSize                 = 1048576 // 1MB TODO make it configurable
-	peerCatchupSleepIntervalMS = 100     // If peer is behind, sleep this amount
+	maxMsgSize                 = 1048576        // 1MB TODO make it configurable
+	maxTxSize                  = maxMsgSize - 8 // account for amino overhead of TxMessage
+	peerCatchupSleepIntervalMS = 100            // If peer is behind, sleep this amount
 )
 
 // MempoolReactor handles mempool tx broadcasting amongst peers.
@@ -98,11 +98,6 @@ func (memR *MempoolReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 	}
 }
 
-// BroadcastTx is an alias for Mempool.CheckTx. Broadcasting itself happens in peer routines.
-func (memR *MempoolReactor) BroadcastTx(tx types.Tx, cb func(*abci.Response)) error {
-	return memR.Mempool.CheckTx(tx, cb)
-}
-
 // PeerState describes the state of a peer.
 type PeerState interface {
 	GetHeight() int64
@@ -116,19 +111,21 @@ func (memR *MempoolReactor) broadcastTxRoutine(peer p2p.Peer) {
 
 	var next *clist.CElement
 	for {
+		select {
+		case <-peer.Quit():
+			return
+		case <-memR.Quit():
+			return
+		default:
+			// continue to broadcast transaction
+		}
 		// This happens because the CElement we were looking at got garbage
 		// collected (removed). That is, .NextWait() returned nil. Go ahead and
 		// start from the beginning.
 		if next == nil {
-			select {
-			case <-memR.Mempool.TxsWaitChan(): // Wait until a tx is available
-				if next = memR.Mempool.TxsFront(); next == nil {
-					continue
-				}
-			case <-peer.Quit():
-				return
-			case <-memR.Quit():
-				return
+			<-memR.Mempool.TxsWaitChan() // Wait until a tx is available
+			if next = memR.Mempool.TxsFront(); next == nil {
+				continue
 			}
 		}
 

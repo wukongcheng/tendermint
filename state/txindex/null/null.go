@@ -28,6 +28,6 @@ func (txi *TxIndex) Index(result *types.TxResult) error {
 	return nil
 }
 
-func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
-	return []*types.TxResult{}, nil
+func (txi *TxIndex) Search(q *query.Query) ([][]byte, error) {
+	return [][]byte{}, nil
 }

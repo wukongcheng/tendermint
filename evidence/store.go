@@ -97,11 +97,18 @@ func (store *EvidenceStore) PendingEvidence(maxBytes int64) (evidence []types.Ev
 // If maxBytes is -1, there's no cap on the size of returned evidence.
 func (store *EvidenceStore) listEvidence(prefixKey string, maxBytes int64) (evidence []types.Evidence) {
 	var bytes int64
+	var count int64
 	iter := dbm.IteratePrefix(store.db, []byte(prefixKey))
 	defer iter.Close()
 	for ; iter.Valid(); iter.Next() {
 		val := iter.Value()
-
+		count++
+		// In block validation, the evidence total size is calculated by (evidence quantity) * (maximum evidence size)
+		if maxBytes > 0 && count * int64(types.MaxEvidenceBytes) > maxBytes {
+			return evidence
+		}
+		// types.MaxEvidenceBytes must be greater than len(val)
+		// The following check might not be necessary, but to reduce risk, just keep them
 		if maxBytes > 0 && bytes+int64(len(val)) > maxBytes {
 			return evidence
 		}
@@ -179,6 +186,7 @@ func (store *EvidenceStore) MarkEvidenceAsCommitted(evidence types.Evidence) {
 
 	ei := store.getEvidenceInfo(evidence)
 	ei.Committed = true
+	ei.Evidence = evidence
 
 	lookupKey := keyLookup(evidence)
 	store.db.SetSync(lookupKey, cdc.MustMarshalBinaryBare(ei))

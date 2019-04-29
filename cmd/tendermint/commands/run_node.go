@@ -22,6 +22,8 @@ func AddNodeFlags(cmd *cobra.Command) {
 
 	// node flags
 	cmd.Flags().Bool("fast_sync", config.FastSync, "Fast blockchain syncing")
+	cmd.Flags().Bool("deprecated", config.Deprecated, "Mark blockchain as deprecated")
+	cmd.Flags().Int64("replay_height", config.ReplayHeight, "Specify which height to replay to, this is useful for exporting at any height")
 
 	// abci flags
 	cmd.Flags().String("proxy_app", config.ProxyApp, "Proxy app address, or 'nilapp' or 'kvstore' for local testing.")

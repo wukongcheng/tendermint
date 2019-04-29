@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -141,7 +140,7 @@ func (txi *TxIndex) Index(result *types.TxResult) error {
 // result for it (2) for range queries it is better for the client to provide
 // both lower and upper bounds, so we are not performing a full scan. Results
 // from querying indexes are then intersected and returned to the caller.
-func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
+func (txi *TxIndex) Search(q *query.Query) ([][]byte, error) {
 	var hashes [][]byte
 	var hashesInitialized bool
 
@@ -155,9 +154,9 @@ func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
 	} else if ok {
 		res, err := txi.Get(hash)
 		if res == nil {
-			return []*types.TxResult{}, nil
+			return hashes, nil
 		}
-		return []*types.TxResult{res}, errors.Wrap(err, "error while retrieving the result")
+		return hashes, errors.Wrap(err, "error while retrieving the result")
 	}
 
 	// conditions to skip because they're handled before "everything else"
@@ -197,25 +196,25 @@ func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
 		}
 	}
 
-	results := make([]*types.TxResult, len(hashes))
-	i := 0
-	for _, h := range hashes {
-		results[i], err = txi.Get(h)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get Tx{%X}", h)
-		}
-		i++
-	}
+	//results := make([]*types.TxResult, len(hashes))
+	//i := 0
+	//for _, h := range hashes {
+	//	results[i], err = txi.Get(h)
+	//	if err != nil {
+	//		return nil, errors.Wrapf(err, "failed to get Tx{%X}", h)
+	//	}
+	//	i++
+	//}
 
 	// sort by height & index by default
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].Height == results[j].Height {
-			return results[i].Index < results[j].Index
-		}
-		return results[i].Height < results[j].Height
-	})
+	//sort.Slice(results, func(i, j int) bool {
+	//	if results[i].Height == results[j].Height {
+	//		return results[i].Index < results[j].Index
+	//	}
+	//	return results[i].Height < results[j].Height
+	//})
 
-	return results, nil
+	return hashes, nil
 }
 
 func lookForHash(conditions []query.Condition) (hash []byte, err error, ok bool) {

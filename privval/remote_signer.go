@@ -56,7 +56,7 @@ func (sc *RemoteSignerClient) getPubKey() (crypto.PubKey, error) {
 	sc.lock.Lock()
 	defer sc.lock.Unlock()
 
-	err := writeMsg(sc.conn, &PubKeyMsg{})
+	err := writeMsg(sc.conn, &PubKeyRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (sc *RemoteSignerClient) getPubKey() (crypto.PubKey, error) {
 		return nil, err
 	}
 
-	return res.(*PubKeyMsg).PubKey, nil
+	return res.(*PubKeyResponse).PubKey, nil
 }
 
 // SignVote implements PrivValidator.
@@ -152,7 +152,8 @@ type RemoteSignerMsg interface{}
 
 func RegisterRemoteSignerMsg(cdc *amino.Codec) {
 	cdc.RegisterInterface((*RemoteSignerMsg)(nil), nil)
-	cdc.RegisterConcrete(&PubKeyMsg{}, "tendermint/remotesigner/PubKeyMsg", nil)
+	cdc.RegisterConcrete(&PubKeyRequest{}, "tendermint/remotesigner/PubKeyRequest", nil)
+	cdc.RegisterConcrete(&PubKeyResponse{}, "tendermint/remotesigner/PubKeyResponse", nil)
 	cdc.RegisterConcrete(&SignVoteRequest{}, "tendermint/remotesigner/SignVoteRequest", nil)
 	cdc.RegisterConcrete(&SignedVoteResponse{}, "tendermint/remotesigner/SignedVoteResponse", nil)
 	cdc.RegisterConcrete(&SignProposalRequest{}, "tendermint/remotesigner/SignProposalRequest", nil)
@@ -161,9 +162,13 @@ func RegisterRemoteSignerMsg(cdc *amino.Codec) {
 	cdc.RegisterConcrete(&PingResponse{}, "tendermint/remotesigner/PingResponse", nil)
 }
 
-// PubKeyMsg is a PrivValidatorSocket message containing the public key.
-type PubKeyMsg struct {
+// PubKeyRequest requests the consensus public key from the remote signer.
+type PubKeyRequest struct{}
+
+// PubKeyResponse is a PrivValidatorSocket message containing the public key.
+type PubKeyResponse struct {
 	PubKey crypto.PubKey
+	Error  *RemoteSignerError
 }
 
 // SignVoteRequest is a PrivValidatorSocket message containing a vote.
@@ -227,10 +232,10 @@ func handleRequest(req RemoteSignerMsg, chainID string, privVal types.PrivValida
 	var err error
 
 	switch r := req.(type) {
-	case *PubKeyMsg:
+	case *PubKeyRequest:
 		var p crypto.PubKey
 		p = privVal.GetPubKey()
-		res = &PubKeyMsg{p}
+		res = &PubKeyResponse{p, nil}
 	case *SignVoteRequest:
 		err = privVal.SignVote(chainID, r.Vote)
 		if err != nil {

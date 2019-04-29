@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 
@@ -22,7 +23,10 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
-//-----------------------------------------------------------------------------
+const (
+	deprecatedToShutdownInterval = 30
+)
+
 // Errors
 
 var (
@@ -74,9 +78,8 @@ type ConsensusState struct {
 	evpool     sm.EvidencePool
 
 	// internal state
-	mtx sync.RWMutex
+	mtx                       sync.RWMutex
 	cstypes.RoundState
-	triggeredTimeoutPrecommit bool
 	state                     sm.State // State until height-1.
 
 	// state changes may be triggered by: msgs from peers,
@@ -116,6 +119,8 @@ type ConsensusState struct {
 
 	// for reporting metrics
 	metrics *Metrics
+
+	Deprecated bool
 }
 
 // StateOption sets an optional parameter on the ConsensusState.
@@ -152,6 +157,7 @@ func NewConsensusState(
 	cs.doPrevote = cs.defaultDoPrevote
 	cs.setProposal = cs.defaultSetProposal
 
+	cs.Deprecated = state.Deprecated
 	cs.updateToState(state)
 
 	// Don't call scheduleRound0 yet.
@@ -534,6 +540,7 @@ func (cs *ConsensusState) updateToState(state sm.State) {
 	cs.LastValidators = state.LastValidators
 
 	cs.state = state
+	cs.Deprecated = state.Deprecated
 
 	// Finally, broadcast RoundState
 	cs.newStep()
@@ -573,6 +580,7 @@ func (cs *ConsensusState) receiveRoutine(maxSteps int) {
 
 	defer func() {
 		if r := recover(); r != nil {
+			cs.metrics.ConsensusFailure.With("height", strconv.Itoa(int(cs.Height))).Add(float64(1))
 			cs.Logger.Error("CONSENSUS FAILURE!!!", "err", r, "stack", string(debug.Stack()))
 			// stop gracefully
 			//
@@ -587,6 +595,11 @@ func (cs *ConsensusState) receiveRoutine(maxSteps int) {
 	}()
 
 	for {
+		if cs.Deprecated {
+			cs.Logger.Info(fmt.Sprintf("this blockchain has been deprecated. %d seconds later, this node will be shutdown", deprecatedToShutdownInterval))
+			time.Sleep(deprecatedToShutdownInterval * time.Second)
+			cmn.Exit("Shutdown this blockchain node")
+		}
 		if maxSteps > 0 {
 			if cs.nSteps >= maxSteps {
 				cs.Logger.Info("reached max steps. exiting receive routine")
@@ -714,6 +727,7 @@ func (cs *ConsensusState) handleTxsAvailable() {
 	cs.mtx.Lock()
 	defer cs.mtx.Unlock()
 	// we only need to do this for round 0
+	cs.enterNewRound(cs.Height, 0)
 	cs.enterPropose(cs.Height, 0)
 }
 
@@ -764,7 +778,7 @@ func (cs *ConsensusState) enterNewRound(height int64, round int) {
 		cs.ProposalBlockParts = nil
 	}
 	cs.Votes.SetRound(round + 1) // also track next round (round+1) to allow round-skipping
-	cs.triggeredTimeoutPrecommit = false
+	cs.TriggeredTimeoutPrecommit = false
 
 	cs.eventBus.PublishEventNewRound(cs.NewRoundEvent())
 	cs.metrics.Rounds.Set(float64(round))
@@ -1121,12 +1135,12 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 func (cs *ConsensusState) enterPrecommitWait(height int64, round int) {
 	logger := cs.Logger.With("height", height, "round", round)
 
-	if cs.Height != height || round < cs.Round || (cs.Round == round && cs.triggeredTimeoutPrecommit) {
+	if cs.Height != height || round < cs.Round || (cs.Round == round && cs.TriggeredTimeoutPrecommit) {
 		logger.Debug(
 			fmt.Sprintf(
 				"enterPrecommitWait(%v/%v): Invalid args. "+
 					"Current state is Height/Round: %v/%v/, triggeredTimeoutPrecommit:%v",
-				height, round, cs.Height, cs.Round, cs.triggeredTimeoutPrecommit))
+				height, round, cs.Height, cs.Round, cs.TriggeredTimeoutPrecommit))
 		return
 	}
 	if !cs.Votes.Precommits(round).HasTwoThirdsAny() {
@@ -1136,7 +1150,7 @@ func (cs *ConsensusState) enterPrecommitWait(height int64, round int) {
 
 	defer func() {
 		// Done enterPrecommitWait:
-		cs.triggeredTimeoutPrecommit = true
+		cs.TriggeredTimeoutPrecommit = true
 		cs.newStep()
 	}()
 

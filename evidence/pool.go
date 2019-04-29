@@ -117,6 +117,14 @@ func (evpool *EvidencePool) AddEvidence(evidence types.Evidence) (err error) {
 	return nil
 }
 
+func (evpool *EvidencePool) IsCommitted(evidence types.Evidence) bool {
+	ei_ := evpool.evidenceStore.GetEvidence(evidence.Height(), evidence.Hash())
+	if ei_ != nil && ei_.Evidence != nil && ei_.Committed {
+		return true
+	}
+	return false
+}
+
 // MarkEvidenceAsCommitted marks all the evidence as committed and removes it from the queue.
 func (evpool *EvidencePool) MarkEvidenceAsCommitted(height int64, evidence []types.Evidence) {
 	// make a map of committed evidence to remove from the clist

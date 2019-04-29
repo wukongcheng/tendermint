@@ -12,6 +12,12 @@ const MetricsSubsystem = "state"
 type Metrics struct {
 	// Time between BeginBlock and EndBlock.
 	BlockProcessingTime metrics.Histogram
+
+	// Time on recheck
+	RecheckTime metrics.Histogram
+
+	// App hash conflict error
+	AppHashConflict metrics.Counter
 }
 
 func PrometheusMetrics(namespace string) *Metrics {
@@ -23,11 +29,26 @@ func PrometheusMetrics(namespace string) *Metrics {
 			Help:      "Time between BeginBlock and EndBlock in ms.",
 			Buckets:   stdprometheus.LinearBuckets(1, 10, 10),
 		}, []string{}),
+		RecheckTime: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "recheck_time",
+			Help:      "Time cost on recheck in ms.",
+			Buckets:   stdprometheus.LinearBuckets(1, 10, 10),
+		}, []string{}),
+		AppHashConflict: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "app_hash_conflict",
+			Help:      "App hash conflict error",
+		}, []string{"proposer", "height"}),
 	}
 }
 
 func NopMetrics() *Metrics {
 	return &Metrics{
 		BlockProcessingTime: discard.NewHistogram(),
+		RecheckTime: 	     discard.NewHistogram(),
+		AppHashConflict:	 discard.NewCounter(),
 	}
 }
