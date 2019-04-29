@@ -81,6 +81,7 @@ type BlockStoreRPC interface {
 type BlockStore interface {
 	BlockStoreRPC
 	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit)
+	RetreatLastBlock()
 }
 
 //-----------------------------------------------------------------------------------------------------

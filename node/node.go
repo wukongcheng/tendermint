@@ -263,7 +263,7 @@ func NewNode(config *cfg.Config,
 	handshaker := cs.NewHandshaker(stateDB, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
-	if err := handshaker.Handshake(proxyApp); err != nil {
+	if err := handshaker.Handshake(proxyApp, &config.BaseConfig); err != nil {
 		return nil, fmt.Errorf("Error during handshake: %v", err)
 	}
 
@@ -571,6 +571,11 @@ func (n *Node) OnStart() error {
 	if n.config.Instrumentation.Prometheus &&
 		n.config.Instrumentation.PrometheusListenAddr != "" {
 		n.prometheusSrv = n.startPrometheusServer(n.config.Instrumentation.PrometheusListenAddr)
+	}
+
+	if n.consensusState.Deprecated || n.config.Deprecated {
+		n.Logger.Info("This blockchain was halt. The consensus engine and p2p gossip have been disabled. Only query rpc interfaces are available")
+		return nil
 	}
 
 	// Start the transport.
