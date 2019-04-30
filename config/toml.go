@@ -122,10 +122,6 @@ abci = "{{ .BaseConfig.ABCI }}"
 # TCP or UNIX socket address for the profiling server to listen on
 prof_laddr = "{{ .BaseConfig.ProfListenAddress }}"
 
-# If true, query the ABCI app on connecting to a new peer
-# so the app can decide if we should keep the connection or not
-filter_peers = {{ .BaseConfig.FilterPeers }}
-
 ##### advanced configuration options #####
 
 ##### rpc server configuration options #####

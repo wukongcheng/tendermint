@@ -417,43 +417,42 @@ func NewNode(config *cfg.Config,
 
 	// Filter peers by addr or pubkey with an ABCI query.
 	// If the query return code is OK, add peer.
-	if config.FilterPeers {
-		connFilters = append(
-			connFilters,
-			// ABCI query for address filtering.
-			func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("Error querying abci app: %v", res)
-				}
+	//if config.FilterPeers {
+	connFilters = append(
+		connFilters,
+		// ABCI query for address filtering.
+		func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("Error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
+			return nil
+		},
+	)
 
-		peerFilters = append(
-			peerFilters,
-			// ABCI query for ID filtering.
-			func(_ p2p.IPeerSet, p p2p.Peer) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("Error querying abci app: %v", res)
-				}
+	peerFilters = append(
+		peerFilters,
+		// ABCI query for ID filtering.
+		func(_ p2p.IPeerSet, p p2p.Peer) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("Error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
-	}
+			return nil
+		},
+	)
 
 	p2p.MultiplexTransportConnFilters(connFilters...)(transport)
 
