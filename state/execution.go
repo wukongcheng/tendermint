@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	HaltTagKey   = "halt_blockchain"
-	HaltTagValue = "true"
+	HaltTagKey           = "halt_blockchain"
+	HaltTagValue         = "true"
 	UpgradeFailureTagKey = "upgrade_failure"
-
+	ShardingTagkey       = "sharding"
 )
 
 //-----------------------------------------------------------------------------
@@ -262,7 +262,13 @@ func execBlockOnProxyApp(
 			// TODO: make use of res.Log
 			// TODO: make use of this info
 			// Blocks may include invalid txs.
+
 			txRes := r.DeliverTx
+			if tag, ok := abci.GetTagByKey(txRes.Tags, ShardingTagkey); ok && bytes.Equal(tag.Value, []byte{byte(1)}) {
+				fmt.Println("this is a sharding tx")
+				txRes = &abci.ResponseDeliverTx{}
+			}
+
 			if txRes.Code == abci.CodeTypeOK {
 				validTxs++
 			} else {
@@ -305,7 +311,7 @@ func execBlockOnProxyApp(
 		return nil, err
 	}
 
-	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Tags, UpgradeFailureTagKey); ok{
+	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Tags, UpgradeFailureTagKey); ok {
 		return nil, fmt.Errorf(string(tag.Value))
 	}
 
@@ -318,9 +324,9 @@ func getBeginBlockValidatorInfo(block *types.Block, lastValSet *types.ValidatorS
 
 	state := LoadState(stateDB)
 	// For replaying blocks, load history validator set
-	if block.Height > 1 && block.Height != state.LastBlockHeight + 1 {
+	if block.Height > 1 && block.Height != state.LastBlockHeight+1 {
 		var err error
-		lastValSet, err = LoadValidators(stateDB, block.Height - 1)
+		lastValSet, err = LoadValidators(stateDB, block.Height-1)
 		if err != nil {
 			panic(fmt.Sprintf("failed to load validatorset at heith %d", state.LastBlockHeight))
 		}
