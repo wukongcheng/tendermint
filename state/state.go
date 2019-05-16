@@ -9,6 +9,7 @@ import (
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	"github.com/tendermint/tendermint/version"
+	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
 // database keys
@@ -81,8 +82,9 @@ type State struct {
 	LastResultsHash []byte
 
 	// the latest AppHash we've received from calling abci.Commit()
-	AppHash []byte
-	Deprecated bool
+	AppHash      []byte
+	ShardingHash cmn.KVPairs
+	Deprecated   bool
 }
 
 // Copy makes a copy of the State for mutating.

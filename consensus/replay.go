@@ -431,10 +431,12 @@ func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBl
 			}
 		}
 
-		appHash, err = sm.ExecCommitBlock(proxyApp.Consensus(), block, h.logger, state.LastValidators, h.stateDB)
+		bz, err := sm.ExecCommitBlock(proxyApp.Consensus(), block, h.logger, state.LastValidators, h.stateDB)
 		if err != nil {
 			return nil, err
 		}
+		cid := types.UnmarshalCommitID(bz)
+		appHash = cid.Hash
 
 		if config.ReplayHeight > 0 && i >= config.ReplayHeight {
 			fmt.Printf("Replay from height %d to height %d successfully", appBlockHeight, config.ReplayHeight)

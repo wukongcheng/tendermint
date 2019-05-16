@@ -11,6 +11,7 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
+	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
 const (
@@ -164,7 +165,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	}
 
 	// Lock mempool, commit app state, update mempoool.
-	appHash, err := blockExec.Commit(state, block)
+	bz, err := blockExec.Commit(state, block)
 	if err != nil {
 		return state, fmt.Errorf("Commit failed for application: %v", err)
 	}
@@ -174,8 +175,12 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 
 	fail.Fail() // XXX
 
+	cid := types.UnmarshalCommitID(bz)
 	// Update the app hash and save the state.
-	state.AppHash = appHash
+	state.AppHash = cid.Hash
+	state.ShardingHash = make(cmn.KVPairs, len(cid.ShardingHash))
+	copy(state.ShardingHash, cid.ShardingHash)
+
 	SaveState(blockExec.db, state)
 	SavePreState(blockExec.db, preState)
 
