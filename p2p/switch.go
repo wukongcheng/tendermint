@@ -605,6 +605,7 @@ func (sw *Switch) addOutboundPeerWithConfig(
 		metrics:      sw.metrics,
 	})
 	if err != nil {
+		fmt.Println("addOutboundPeerWithConfig - error: " + err.Error())
 		switch e := err.(type) {
 		case ErrRejected:
 			if e.IsSelf() {
@@ -668,9 +669,13 @@ func (sw *Switch) filterPeer(p Peer) error {
 // addPeer starts up the Peer and adds it to the Switch. Error is returned if
 // the peer is filtered out or failed to start or can't be added.
 func (sw *Switch) addPeer(p Peer) error {
+	fmt.Println("addPeer - filterPeer: " + p.String())
 	if err := sw.filterPeer(p); err != nil {
+		fmt.Println("addPeer - filterPeer - error: " + err.Error())
 		return err
 	}
+
+	fmt.Println("addPeer - filterPeer - pass")
 
 	p.SetLogger(sw.Logger.With("peer", p.SocketAddr()))
 

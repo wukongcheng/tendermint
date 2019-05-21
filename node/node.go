@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -16,8 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 
-	amino "github.com/tendermint/go-amino"
-	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/go-amino"
 	bc "github.com/tendermint/tendermint/blockchain"
 	cfg "github.com/tendermint/tendermint/config"
 	cs "github.com/tendermint/tendermint/consensus"
@@ -195,6 +195,15 @@ func NewNode(config *cfg.Config,
 
 	// Get genesis doc
 	// TODO: move to state package?
+	fmt.Println("Tendermint genesis file path : " + config.GenesisFile())
+	jsonFile, err := os.Open(config.GenesisFile())
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer jsonFile.Close()
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	fmt.Println(string(byteValue))
+
 	genDoc, err := loadGenesisDoc(stateDB)
 	if err != nil {
 		genDoc, err = genesisDocProvider()
@@ -418,41 +427,41 @@ func NewNode(config *cfg.Config,
 	// Filter peers by addr or pubkey with an ABCI query.
 	// If the query return code is OK, add peer.
 	//if config.FilterPeers {
-	connFilters = append(
-		connFilters,
-		// ABCI query for address filtering.
-		func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
-			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-				Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
-			})
-			if err != nil {
-				return err
-			}
-			if res.IsErr() {
-				return fmt.Errorf("Error querying abci app: %v", res)
-			}
-
-			return nil
-		},
-	)
-
-	peerFilters = append(
-		peerFilters,
-		// ABCI query for ID filtering.
-		func(_ p2p.IPeerSet, p p2p.Peer) error {
-			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-				Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
-			})
-			if err != nil {
-				return err
-			}
-			if res.IsErr() {
-				return fmt.Errorf("Error querying abci app: %v", res)
-			}
-
-			return nil
-		},
-	)
+	//connFilters = append(
+	//	connFilters,
+	//	// ABCI query for address filtering.
+	//	func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
+	//		res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+	//			Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
+	//		})
+	//		if err != nil {
+	//			return err
+	//		}
+	//		if res.IsErr() {
+	//			return fmt.Errorf("Error querying abci app: %v", res)
+	//		}
+	//
+	//		return nil
+	//	},
+	//)
+	//
+	//peerFilters = append(
+	//	peerFilters,
+	//	// ABCI query for ID filtering.
+	//	func(_ p2p.IPeerSet, p p2p.Peer) error {
+	//		res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+	//			Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
+	//		})
+	//		if err != nil {
+	//			return err
+	//		}
+	//		if res.IsErr() {
+	//			return fmt.Errorf("Error querying abci app: %v", res)
+	//		}
+	//
+	//		return nil
+	//	},
+	//)
 
 	p2p.MultiplexTransportConnFilters(connFilters...)(transport)
 
@@ -910,6 +919,7 @@ var (
 // panics if failed to unmarshal bytes
 func loadGenesisDoc(db dbm.DB) (*types.GenesisDoc, error) {
 	bytes := db.Get(genesisDocKey)
+	fmt.Println(string(bytes))
 	if len(bytes) == 0 {
 		return nil, errors.New("Genesis doc not found")
 	}
