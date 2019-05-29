@@ -387,7 +387,7 @@ func (h *Header) Populate(
 	version version.Consensus, chainID string,
 	timestamp time.Time, lastBlockID BlockID, totalTxs int64,
 	valHash, nextValHash []byte,
-	consensusHash, appHash, lastResultsHash []byte,
+	consensusHash, appHash,
 	proposerAddress Address,
 ) {
 	h.Version = version
@@ -399,7 +399,6 @@ func (h *Header) Populate(
 	h.NextValidatorsHash = nextValHash
 	h.ConsensusHash = consensusHash
 	h.AppHash = appHash
-	h.LastResultsHash = lastResultsHash
 	h.ProposerAddress = proposerAddress
 }
 
@@ -427,7 +426,6 @@ func (h *Header) Hash() cmn.HexBytes {
 		cdcEncode(h.NextValidatorsHash),
 		cdcEncode(h.ConsensusHash),
 		cdcEncode(h.AppHash),
-		cdcEncode(h.LastResultsHash),
 		cdcEncode(h.EvidenceHash),
 		cdcEncode(h.ProposerAddress),
 	})

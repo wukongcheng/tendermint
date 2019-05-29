@@ -18,7 +18,6 @@ const (
 	HaltTagKey           = "halt_blockchain"
 	HaltTagValue         = "true"
 	UpgradeFailureTagKey = "upgrade_failure"
-	ShardingTagkey       = "sharding"
 )
 
 //-----------------------------------------------------------------------------
@@ -269,10 +268,6 @@ func execBlockOnProxyApp(
 			// Blocks may include invalid txs.
 
 			txRes := r.DeliverTx
-			if tag, ok := abci.GetTagByKey(txRes.Tags, ShardingTagkey); ok && bytes.Equal(tag.Value, []byte{byte(1)}) {
-				fmt.Println("this is a sharding tx")
-				txRes = &abci.ResponseDeliverTx{}
-			}
 
 			if txRes.Code == abci.CodeTypeOK {
 				validTxs++

@@ -159,8 +159,7 @@ func (state State) MakeBlock(
 		state.Version.Consensus, state.ChainID,
 		timestamp, state.LastBlockID, state.LastBlockTotalTx+block.NumTxs,
 		state.Validators.Hash(), state.NextValidators.Hash(),
-		state.ConsensusParams.Hash(), state.AppHash, state.LastResultsHash,
-		proposerAddress,
+		state.ConsensusParams.Hash(), state.AppHash, proposerAddress,
 	)
 
 	return block, block.MakePartSet(types.BlockPartSizeBytes)
