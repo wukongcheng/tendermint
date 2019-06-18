@@ -2,7 +2,10 @@ package p2p
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 
@@ -24,8 +27,12 @@ const IDByteLength = crypto.AddressSize
 
 // NodeKey is the persistent peer key.
 // It contains the nodes private key for authentication.
+// It also contains keys used in private txs
 type NodeKey struct {
-	PrivKey crypto.PrivKey `json:"priv_key"` // our priv key
+	PrivKey    crypto.PrivKey               `json:"priv_key"` // our priv key
+	RSAPrivKey string                       `json:"rsa_priv_key"`
+	RSAPubkKey string                       `json:"rsa_pub_key"`
+	OrgKeys    map[string]map[string]string `json:"org_keys"`
 }
 
 // ID returns the peer's canonical ID - the hash of its public key.
@@ -33,9 +40,35 @@ func (nodeKey *NodeKey) ID() ID {
 	return PubKeyToID(nodeKey.PubKey())
 }
 
+// GetRSAPrivKey retrive rsa privkey
+func (nodeKey *NodeKey) GetRSAPrivKey() (*rsa.PrivateKey, error) {
+	rk, err := hex.DecodeString(nodeKey.RSAPrivKey)
+	if err != nil {
+		return nil, errors.New("Decode RSAPrivKey failed:" + err.Error())
+	}
+	privkey, err := x509.ParsePKCS1PrivateKey(rk)
+	if err != nil {
+		return nil, errors.New("Parse RSAPrivKey failed:" + err.Error())
+	}
+	return privkey, nil
+}
+
 // PubKey returns the peer's PubKey
 func (nodeKey *NodeKey) PubKey() crypto.PubKey {
 	return nodeKey.PrivKey.PubKey()
+}
+
+// Save rewrite
+func (nodeKey *NodeKey) Save(filePath string) error {
+	jsonBytes, err := cdc.MarshalJSONIndent(nodeKey, "", "	")
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(filePath, jsonBytes, 0600)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // PubKeyToID returns the ID corresponding to the given PubKey.
@@ -72,11 +105,22 @@ func LoadNodeKey(filePath string) (*NodeKey, error) {
 
 func genNodeKey(filePath string) (*NodeKey, error) {
 	privKey := ed25519.GenPrivKey()
+
+	// gen rsk key pair
+	rsaSK, err := rsa.GenerateKey(crypto.CReader(), 1024)
+	if err != nil {
+		return nil, err
+	}
+	rsaSKbs := x509.MarshalPKCS1PrivateKey(rsaSK)
+	rsaPKbs := x509.MarshalPKCS1PublicKey(&rsaSK.PublicKey)
+
 	nodeKey := &NodeKey{
-		PrivKey: privKey,
+		PrivKey:    privKey,
+		RSAPrivKey: hex.EncodeToString(rsaSKbs),
+		RSAPubkKey: hex.EncodeToString(rsaPKbs),
 	}
 
-	jsonBytes, err := cdc.MarshalJSON(nodeKey)
+	jsonBytes, err := cdc.MarshalJSONIndent(nodeKey, "", "	")
 	if err != nil {
 		return nil, err
 	}
