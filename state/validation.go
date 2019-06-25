@@ -204,3 +204,22 @@ func VerifyEvidence(stateDB dbm.DB, state State, evidence types.Evidence) error 
 
 	return nil
 }
+
+func CheckAppHashAndShardingHash(state State, ci types.CommitID) error {
+	if !bytes.Equal(state.AppHash, ci.Hash) {
+		panic(fmt.Errorf("Tendermint state.AppHash does not match AppHash after replay. Got %X, expected %X", ci.Hash, state.AppHash).Error())
+	}
+
+	shm := make(map[string][]byte)
+	for _, pair := range state.ShardingHash {
+		shm[string(pair.Key)] = pair.Value
+	}
+	for _, pair := range ci.ShardingHash {
+		if hash, ok := shm[string(pair.Key)]; ok {
+			if !bytes.Equal(hash, pair.Value) {
+				panic(fmt.Errorf("Tendermint state.ShardingHash does not match ShardingHash for sharding %s after replay. Got %X, expected %X", string(pair.Key), hash, pair.Value).Error())
+			}
+		}
+	}
+	return nil
+}

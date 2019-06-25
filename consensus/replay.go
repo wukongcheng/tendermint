@@ -456,7 +456,7 @@ func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBl
 		appHash = state.AppHash
 	}
 
-	return appHash, checkAppHashAndShardingHash(state, cid)
+	return appHash, sm.CheckAppHashAndShardingHash(state, cid)
 }
 
 // ApplyBlock on the proxyApp with the last block.
@@ -481,25 +481,6 @@ func (h *Handshaker) replayBlock(state sm.State, height int64, proxyApp proxy.Ap
 func checkAppHash(state sm.State, appHash []byte) error {
 	if !bytes.Equal(state.AppHash, appHash) {
 		panic(fmt.Errorf("Tendermint state.AppHash does not match AppHash after replay. Got %X, expected %X", appHash, state.AppHash).Error())
-	}
-	return nil
-}
-
-func checkAppHashAndShardingHash(state sm.State, ci types.CommitID) error {
-	if !bytes.Equal(state.AppHash, ci.Hash) {
-		panic(fmt.Errorf("Tendermint state.AppHash does not match AppHash after replay. Got %X, expected %X", ci.Hash, state.AppHash).Error())
-	}
-
-	shm := make(map[string][]byte)
-	for _, pair := range state.ShardingHash {
-		shm[string(pair.Key)] = pair.Value
-	}
-	for _, pair := range ci.ShardingHash {
-		if hash, ok := shm[string(pair.Key)]; ok {
-			if !bytes.Equal(hash, pair.Value) {
-				panic(fmt.Errorf("Tendermint state.ShardingHash does not match ShardingHash for sharding %s after replay. Got %X, expected %X", string(pair.Key), hash, pair.Value).Error())
-			}
-		}
 	}
 	return nil
 }

@@ -175,6 +175,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	fail.Fail() // XXX
 
 	cid := types.UnmarshalCommitID(bz)
+	CheckAppHashAndShardingHash(state, cid)
 	// Update the app hash and save the state.
 	state.AppHash = cid.Hash
 	state.ShardingHash = make(cmn.KVPairs, len(cid.ShardingHash))
