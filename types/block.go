@@ -374,6 +374,7 @@ type Header struct {
 	NextValidatorsHash cmn.HexBytes `json:"next_validators_hash"` // validators for the next block
 	ConsensusHash      cmn.HexBytes `json:"consensus_hash"`       // consensus params for current block
 	AppHash            cmn.HexBytes `json:"app_hash"`             // state after txs from the previous block
+	ShardingHash	   string       `json:"sharding_hash"`
 	LastResultsHash    cmn.HexBytes `json:"last_results_hash"`    // root hash of all results from the txs from the previous block
 
 	// consensus info
@@ -388,7 +389,7 @@ func (h *Header) Populate(
 	timestamp time.Time, lastBlockID BlockID, totalTxs int64,
 	valHash, nextValHash []byte,
 	consensusHash, appHash,
-	proposerAddress Address,
+	proposerAddress Address, shardingHash cmn.KVPairs,
 ) {
 	h.Version = version
 	h.ChainID = chainID
@@ -400,6 +401,7 @@ func (h *Header) Populate(
 	h.ConsensusHash = consensusHash
 	h.AppHash = appHash
 	h.ProposerAddress = proposerAddress
+	h.ShardingHash = shardingHash.ToString()
 }
 
 // Hash returns the hash of the header.
