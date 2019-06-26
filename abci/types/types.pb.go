@@ -2138,10 +2138,53 @@ func (m *ResponseCheckTx) GetCodespace() string {
 	return ""
 }
 
+
+// TxEvent begin ----------------------------------------------------------------------------------------------------
+
+type TxEvent struct {
+	Address              []byte   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Topics               [][]byte `protobuf:"bytes,3,rep,name=topics,proto3" json:"topics,omitempty"`
+	BlockNumber          uint64   `protobuf:"varint,4,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`
+	TxHash               []byte   `protobuf:"bytes,5,opt,name=tx_hash,json=txHash,proto3" json:"tx_hash,omitempty"`
+	BlockHash            []byte   `protobuf:"bytes,6,opt,name=block_hash,json=blockHash,proto3" json:"block_hash,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *TxEvent) Reset()         { *m = TxEvent{} }
+func (m *TxEvent) String() string { return proto.CompactTextString(m) }
+func (*TxEvent) ProtoMessage()    {}
+func (*TxEvent) Descriptor() ([]byte, []int) {
+	return fileDescriptor_types_a177e47fab90f91d, []int{0}
+}
+
+func (m *TxEvent) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_TxEvent.Unmarshal(m, b)
+}
+func (m *TxEvent) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_TxEvent.Marshal(b, m, deterministic)
+}
+func (m *TxEvent) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TxEvent.Merge(m, src)
+}
+func (m *TxEvent) XXX_Size() int {
+	return xxx_messageInfo_TxEvent.Size(m)
+}
+func (m *TxEvent) XXX_DiscardUnknown() {
+	xxx_messageInfo_TxEvent.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TxEvent proto.InternalMessageInfo
+
+// TxEvent end   ----------------------------------------------------------------------------------------------------
+
 type ResponseDeliverTx struct {
 	Code                 uint32          `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Data                 []byte          `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	Log                  string          `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`
+	Events               []TxEvent       `protobuf:"bytes,9,opt,name=events,proto3" json:"events,omitempty"`
 	Info                 string          `protobuf:"bytes,4,opt,name=info,proto3" json:"info,omitempty"`
 	GasWanted            int64           `protobuf:"varint,5,opt,name=gas_wanted,json=gasWanted,proto3" json:"gas_wanted,omitempty"`
 	GasUsed              int64           `protobuf:"varint,6,opt,name=gas_used,json=gasUsed,proto3" json:"gas_used,omitempty"`
