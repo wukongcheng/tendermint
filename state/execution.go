@@ -181,6 +181,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	copy(state.ShardingHash, cid.ShardingHash)
 
 	SaveState(blockExec.db, state)
+	fmt.Println(state.AppHash)
 	SavePreState(blockExec.db, preState)
 
 	fail.Fail() // XXX
