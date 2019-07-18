@@ -392,7 +392,11 @@ func (h *Handshaker) ReplayBlocks(
 			if err != nil {
 				return nil, err
 			}
-			mockApp := newMockProxyApp(appHash, abciResponses)
+			res, err := proxyApp.Query().InfoSync(proxy.RequestInfo)
+			if err != nil {
+				return nil, fmt.Errorf("Error calling Info: %v", err)
+			}
+			mockApp := newMockProxyApp([]byte(res.Data), abciResponses)
 			h.logger.Info("Replay last block using mock app")
 			state, err = h.replayBlock(state, storeBlockHeight, mockApp)
 			return state.AppHash, err
