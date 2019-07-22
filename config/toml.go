@@ -81,6 +81,11 @@ moniker = "{{ .BaseConfig.Moniker }}"
 # and verifying their commits
 fast_sync = {{ .BaseConfig.FastSync }}
 
+# If the blockchain is deprecated, run node with Deprecated will
+# work in query only mode. Consensus engine and p2p gossip will be
+# shutdown
+deprecated = {{ .BaseConfig.Deprecated }}
+
 # Database backend: leveldb | memdb | cleveldb
 db_backend = "{{ .BaseConfig.DBBackend }}"
 
@@ -116,10 +121,6 @@ abci = "{{ .BaseConfig.ABCI }}"
 
 # TCP or UNIX socket address for the profiling server to listen on
 prof_laddr = "{{ .BaseConfig.ProfListenAddress }}"
-
-# If true, query the ABCI app on connecting to a new peer
-# so the app can decide if we should keep the connection or not
-filter_peers = {{ .BaseConfig.FilterPeers }}
 
 ##### advanced configuration options #####
 

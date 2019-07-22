@@ -65,6 +65,10 @@ func LoadStateFromDBOrGenesisDoc(stateDB dbm.DB, genesisDoc *types.GenesisDoc) (
 	return state, nil
 }
 
+func LoadPreState(db dbm.DB) State {
+	return loadState(db, statePreKey)
+}
+
 // LoadState loads the State from the database.
 func LoadState(db dbm.DB) State {
 	return loadState(db, stateKey)
@@ -91,6 +95,10 @@ func loadState(db dbm.DB, key []byte) (state State) {
 // This flushes the writes (e.g. calls SetSync).
 func SaveState(db dbm.DB, state State) {
 	saveState(db, state, stateKey)
+}
+
+func SavePreState(db dbm.DB, state State) {
+	saveState(db, state, statePreKey)
 }
 
 func saveState(db dbm.DB, state State, key []byte) {

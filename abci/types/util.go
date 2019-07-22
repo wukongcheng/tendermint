@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"sort"
+	common "github.com/tendermint/tendermint/libs/common"
 )
 
 //------------------------------------------------------------------------------
@@ -31,4 +32,13 @@ func (v ValidatorUpdates) Swap(i, j int) {
 	v1 := v[i]
 	v[i] = v[j]
 	v[j] = v1
+}
+
+func GetTagByKey(tags []common.KVPair, key string) (common.KVPair, bool) {
+	for _, tag := range tags {
+		if bytes.Equal(tag.Key, []byte(key)) {
+			return tag, true
+		}
+	}
+	return common.KVPair{}, false
 }

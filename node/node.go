@@ -263,7 +263,7 @@ func NewNode(config *cfg.Config,
 	handshaker := cs.NewHandshaker(stateDB, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
-	if err := handshaker.Handshake(proxyApp); err != nil {
+	if err := handshaker.Handshake(proxyApp, &config.BaseConfig); err != nil {
 		return nil, fmt.Errorf("Error during handshake: %v", err)
 	}
 
@@ -417,43 +417,42 @@ func NewNode(config *cfg.Config,
 
 	// Filter peers by addr or pubkey with an ABCI query.
 	// If the query return code is OK, add peer.
-	if config.FilterPeers {
-		connFilters = append(
-			connFilters,
-			// ABCI query for address filtering.
-			func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("Error querying abci app: %v", res)
-				}
+	//if config.FilterPeers {
+	connFilters = append(
+		connFilters,
+		// ABCI query for address filtering.
+		func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("Error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
+			return nil
+		},
+	)
 
-		peerFilters = append(
-			peerFilters,
-			// ABCI query for ID filtering.
-			func(_ p2p.IPeerSet, p p2p.Peer) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("Error querying abci app: %v", res)
-				}
+	peerFilters = append(
+		peerFilters,
+		// ABCI query for ID filtering.
+		func(_ p2p.IPeerSet, p p2p.Peer) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("Error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
-	}
+			return nil
+		},
+	)
 
 	p2p.MultiplexTransportConnFilters(connFilters...)(transport)
 
@@ -571,6 +570,11 @@ func (n *Node) OnStart() error {
 	if n.config.Instrumentation.Prometheus &&
 		n.config.Instrumentation.PrometheusListenAddr != "" {
 		n.prometheusSrv = n.startPrometheusServer(n.config.Instrumentation.PrometheusListenAddr)
+	}
+
+	if n.consensusState.Deprecated || n.config.Deprecated {
+		n.Logger.Info("This blockchain was halt. The consensus engine and p2p gossip have been disabled. Only query rpc interfaces are available")
+		return nil
 	}
 
 	// Start the transport.

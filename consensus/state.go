@@ -26,6 +26,10 @@ import (
 //-----------------------------------------------------------------------------
 // Errors
 
+const (
+	deprecatedToShutdownInterval = 30
+)
+
 var (
 	ErrInvalidProposalSignature = errors.New("Error invalid proposal signature")
 	ErrInvalidProposalPOLRound  = errors.New("Error invalid proposal POL round")
@@ -133,6 +137,7 @@ type ConsensusState struct {
 
 	// for reporting metrics
 	metrics *Metrics
+	Deprecated bool
 }
 
 // StateOption sets an optional parameter on the ConsensusState.
@@ -169,6 +174,7 @@ func NewConsensusState(
 	cs.doPrevote = cs.defaultDoPrevote
 	cs.setProposal = cs.defaultSetProposal
 
+	cs.Deprecated = state.Deprecated
 	cs.updateToState(state)
 
 	// Don't call scheduleRound0 yet.
@@ -622,6 +628,12 @@ func (cs *ConsensusState) receiveRoutine(maxSteps int) {
 	}()
 
 	for {
+		if cs.Deprecated {
+			cs.Logger.Info(fmt.Sprintf("this blockchain has been deprecated. %d seconds later, this node will be shutdown", deprecatedToShutdownInterval))
+			time.Sleep(deprecatedToShutdownInterval * time.Second)
+			cmn.Exit("Shutdown this blockchain node")
+		}
+
 		if maxSteps > 0 {
 			if cs.nSteps >= maxSteps {
 				cs.Logger.Info("reached max steps. exiting receive routine")

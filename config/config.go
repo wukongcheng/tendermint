@@ -153,6 +153,13 @@ type BaseConfig struct {
 	// and verifying their commits
 	FastSync bool `mapstructure:"fast_sync"`
 
+	// If the blockchain is deprecated, run node with Deprecated will
+	// work in query only mode. Consensus engine and p2p gossip will be
+	// shutdown
+	Deprecated bool `mapstructure:"deprecated"`
+
+	ReplayHeight int64 `mapstructure:"replay_height"`
+
 	// Database backend: leveldb | memdb | cleveldb
 	DBBackend string `mapstructure:"db_backend"`
 
@@ -189,7 +196,7 @@ type BaseConfig struct {
 
 	// If true, query the ABCI app on connecting to a new peer
 	// so the app can decide if we should keep the connection or not
-	FilterPeers bool `mapstructure:"filter_peers"` // false
+	//FilterPeers bool `mapstructure:"filter_peers"` // false
 }
 
 // DefaultBaseConfig returns a default base configuration for a Tendermint node
@@ -206,7 +213,9 @@ func DefaultBaseConfig() BaseConfig {
 		LogFormat:          LogFormatPlain,
 		ProfListenAddress:  "",
 		FastSync:           true,
-		FilterPeers:        false,
+		Deprecated:         false,
+		ReplayHeight:       -1,
+		//FilterPeers:        false,
 		DBBackend:          "leveldb",
 		DBPath:             "data",
 	}
