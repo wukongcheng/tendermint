@@ -253,13 +253,13 @@ func createAndStartIndexerService(config *cfg.Config, dbProvider DBProvider,
 	return indexerService, txIndexer, nil
 }
 
-func doHandshake(stateDB dbm.DB, state sm.State, blockStore sm.BlockStore,
+func doHandshake(config *cfg.Config, stateDB dbm.DB, state sm.State, blockStore sm.BlockStore,
 	genDoc *types.GenesisDoc, eventBus *types.EventBus, proxyApp proxy.AppConns, consensusLogger log.Logger) error {
 
 	handshaker := cs.NewHandshaker(stateDB, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
-	if err := handshaker.Handshake(proxyApp); err != nil {
+	if err := handshaker.Handshake(proxyApp, &config.BaseConfig); err != nil {
 		return fmt.Errorf("error during handshake: %v", err)
 	}
 	return nil
@@ -384,43 +384,41 @@ func createTransport(config *cfg.Config, nodeInfo p2p.NodeInfo, nodeKey *p2p.Nod
 
 	// Filter peers by addr or pubkey with an ABCI query.
 	// If the query return code is OK, add peer.
-	if config.FilterPeers {
-		connFilters = append(
-			connFilters,
-			// ABCI query for address filtering.
-			func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("error querying abci app: %v", res)
-				}
+	connFilters = append(
+		connFilters,
+		// ABCI query for address filtering.
+		func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
+			return nil
+		},
+	)
 
-		peerFilters = append(
-			peerFilters,
-			// ABCI query for ID filtering.
-			func(_ p2p.IPeerSet, p p2p.Peer) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("error querying abci app: %v", res)
-				}
+	peerFilters = append(
+		peerFilters,
+		// ABCI query for ID filtering.
+		func(_ p2p.IPeerSet, p p2p.Peer) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
-	}
+			return nil
+		},
+	)
 
 	p2p.MultiplexTransportConnFilters(connFilters...)(transport)
 	return transport, peerFilters
@@ -549,7 +547,7 @@ func NewNode(config *cfg.Config,
 	// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 	// and replays any blocks as necessary to sync tendermint with the app.
 	consensusLogger := logger.With("module", "consensus")
-	if err := doHandshake(stateDB, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+	if err := doHandshake(config, stateDB, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
 		return nil, err
 	}
 
@@ -712,6 +710,11 @@ func (n *Node) OnStart() error {
 	if n.config.Instrumentation.Prometheus &&
 		n.config.Instrumentation.PrometheusListenAddr != "" {
 		n.prometheusSrv = n.startPrometheusServer(n.config.Instrumentation.PrometheusListenAddr)
+	}
+
+	if n.consensusState.Deprecated || n.config.Deprecated {
+		n.Logger.Info("This blockchain was halt. The consensus engine and p2p gossip have been disabled. Only query rpc interfaces are available")
+		return nil
 	}
 
 	// Start the transport.

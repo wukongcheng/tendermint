@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	"github.com/tendermint/tendermint/version"
@@ -13,7 +14,8 @@ import (
 
 // database keys
 var (
-	stateKey = []byte("stateKey")
+	stateKey    = []byte("stateKey")
+	statePreKey = []byte("statePreKey")
 )
 
 //-----------------------------------------------------------------------------
@@ -80,7 +82,9 @@ type State struct {
 	LastResultsHash []byte
 
 	// the latest AppHash we've received from calling abci.Commit()
-	AppHash []byte
+	AppHash 	 []byte
+	ShardingHash cmn.KVPairs
+	Deprecated   bool
 }
 
 // Copy makes a copy of the State for mutating.
@@ -102,9 +106,11 @@ func (state State) Copy() State {
 		ConsensusParams:                  state.ConsensusParams,
 		LastHeightConsensusParamsChanged: state.LastHeightConsensusParamsChanged,
 
-		AppHash: state.AppHash,
+		AppHash:      state.AppHash,
+		ShardingHash: state.ShardingHash,
 
 		LastResultsHash: state.LastResultsHash,
+		Deprecated:      state.Deprecated,
 	}
 }
 
@@ -154,8 +160,7 @@ func (state State) MakeBlock(
 		state.Version.Consensus, state.ChainID,
 		timestamp, state.LastBlockID, state.LastBlockTotalTx+block.NumTxs,
 		state.Validators.Hash(), state.NextValidators.Hash(),
-		state.ConsensusParams.Hash(), state.AppHash, state.LastResultsHash,
-		proposerAddress,
+		state.ConsensusParams.Hash(), state.AppHash, proposerAddress, state.ShardingHash,
 	)
 
 	return block, block.MakePartSet(types.BlockPartSizeBytes)
