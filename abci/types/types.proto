@@ -185,7 +185,7 @@ message ResponseCheckTx {
   string codespace = 8;
 }
 
-message TxEvent {
+message VMEvent {
     bytes   address         = 1;
     bytes   data            = 2;
     repeated bytes topics   = 3;
@@ -198,7 +198,7 @@ message ResponseDeliverTx {
   uint32 code = 1;
   bytes data = 2;
   string log = 3; // nondeterministic
-  repeated TxEvent events = 9;
+  repeated VMEvent events = 9;
   string info = 4; // nondeterministic
   int64 gas_wanted = 5;
   int64 gas_used = 6;

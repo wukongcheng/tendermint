@@ -2,8 +2,13 @@ package types
 
 import (
 	"bytes"
-	"github.com/tendermint/tendermint/libs/common"
 	"sort"
+
+	"github.com/tendermint/tendermint/libs/common"
+)
+
+const (
+	defaultEvent = "origin-tags"
 )
 
 //------------------------------------------------------------------------------
@@ -34,11 +39,40 @@ func (v ValidatorUpdates) Swap(i, j int) {
 	v[j] = v1
 }
 
-func GetTagByKey(tags []common.KVPair, key string) (common.KVPair, bool) {
-	for _, tag := range tags {
-		if bytes.Equal(tag.Key, []byte(key)) {
-			return tag, true
+func GetTagByKey(events []Event, key string) (common.KVPair, bool) {
+	for _, event := range events {
+		if event.GetType() != defaultEvent {
+			continue
+		}
+		for _, tag := range event.Attributes {
+			if bytes.Equal(tag.Key, []byte(key)) {
+				return tag, true
+			}
 		}
 	}
+
 	return common.KVPair{}, false
+}
+
+func TagsToDefaultEvent(events []Event, tags ...common.KVPair) []Event {
+	if len(events) == 0 {
+		events = append(events, Event{Type: defaultEvent})
+	}
+	for i, v := range events {
+		if v.Type == defaultEvent {
+			events[i].Attributes = append(events[i].Attributes, tags...)
+		}
+	}
+	return events
+}
+
+func GetDefaultTags(events []Event) []common.KVPair {
+	for _, v := range events {
+		if v.Type == defaultEvent {
+			pairs := make([]common.KVPair, len(v.Attributes))
+			copy(pairs, v.Attributes)
+			return pairs
+		}
+	}
+	return nil
 }
