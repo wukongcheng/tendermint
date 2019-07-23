@@ -6,13 +6,13 @@ import (
 	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
+	cmn "github.com/tendermint/tendermint/libs/common"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/fail"
 	"github.com/tendermint/tendermint/libs/log"
 	mempl "github.com/tendermint/tendermint/mempool"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
-	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
 const (
@@ -164,7 +164,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 		return state, fmt.Errorf("Commit failed for application: %v", err)
 	}
 
-	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Tags, HaltTagKey); ok && bytes.Equal(tag.Value, []byte(HaltTagValue)) {
+	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Events, HaltTagKey); ok && bytes.Equal(tag.Value, []byte(HaltTagValue)) {
 		state.Deprecated = true
 	}
 
@@ -315,7 +315,7 @@ func execBlockOnProxyApp(
 		return nil, err
 	}
 
-	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Tags, UpgradeFailureTagKey); ok {
+	if tag, ok := abci.GetTagByKey(abciResponses.EndBlock.Events, UpgradeFailureTagKey); ok {
 		return nil, fmt.Errorf(string(tag.Value))
 	}
 

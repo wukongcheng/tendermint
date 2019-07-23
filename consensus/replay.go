@@ -14,6 +14,7 @@ import (
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
+
 	//auto "github.com/tendermint/tendermint/libs/autofile"
 
 	dbm "github.com/tendermint/tendermint/libs/db"
@@ -238,7 +239,7 @@ func (h *Handshaker) NBlocks() int {
 }
 
 // TODO: retry the handshake/replay if it fails ?
-func (h *Handshaker) Handshake(proxyApp proxy.AppConns, config * cfg.BaseConfig) error {
+func (h *Handshaker) Handshake(proxyApp proxy.AppConns, config *cfg.BaseConfig) error {
 
 	// Handshake is done via ABCI Info on the query conn.
 	res, err := proxyApp.Query().InfoSync(proxy.RequestInfo)
@@ -440,7 +441,7 @@ func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBl
 			assertAppHashEqualsOneFromBlock(appHash, block)
 		}
 
-		bz, err := sm.ExecCommitBlock(proxyApp.Consensus(), block, h.logger, state.LastValidators, h.stateDB)
+		bz, err := sm.ExecCommitBlock(proxyApp.Consensus(), block, h.logger, h.stateDB)
 		if err != nil {
 			return nil, err
 		}
