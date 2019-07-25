@@ -27,7 +27,7 @@ type BlockStoreRPC interface {
 // BlockStore defines the BlockStore interface used by the ConsensusState.
 type BlockStore interface {
 	BlockStoreRPC
-	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit)
+	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit, checkContiguous bool)
 	RetreatLastBlock()
 }
 

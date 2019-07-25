@@ -8,6 +8,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -120,6 +121,7 @@ func DefaultNewNode(config *cfg.Config, logger log.Logger) (*Node, error) {
 		DefaultDBProvider,
 		DefaultMetricsProvider(config.Instrumentation),
 		logger,
+		false,
 	)
 }
 
@@ -190,13 +192,69 @@ type Node struct {
 	prometheusSrv    *http.Server
 }
 
-func initDBs(config *cfg.Config, dbProvider DBProvider) (blockStore *bc.BlockStore, stateDB dbm.DB, err error) {
+func initDBs(config *cfg.Config, dbProvider DBProvider, reapNow bool) (blockStore *bc.BlockStore, stateDB dbm.DB, err error) {
+	storePath := filepath.Join(config.DBDir(), "blockstore.db")
+	bakPath := filepath.Join(config.DBDir(), "blockstore_bak.db")
+
+	// maybe crashed last time
+	if cmn.FileExists(bakPath) {
+		if err = os.RemoveAll(storePath); err != nil {
+			panic(err)
+		}
+		if err = os.Rename(bakPath, storePath); err != nil {
+			panic(err)
+		}
+	}
+
 	var blockStoreDB dbm.DB
 	blockStoreDB, err = dbProvider(&DBContext{"blockstore", config})
 	if err != nil {
 		return
 	}
 	blockStore = bc.NewBlockStore(blockStoreDB)
+
+	if reapNow && blockStore.Height() > 2 {
+		type unit struct {
+			block      *types.Block
+			blockParts *types.PartSet
+			seenCommit *types.Commit
+		}
+		var blocks [2]unit
+		for i := int64(0); i < 2; i++ {
+			height := blockStore.Height() - (1 - i)
+			var found bool
+			found, blocks[i].block, blocks[i].blockParts, blocks[i].seenCommit = blockStore.LoadWholeBlock(height)
+			if !found {
+				panic(fmt.Sprintf("cannot find block height %d", height))
+			}
+		}
+
+		// backup old blockstore
+		blockStoreDB.Close()
+		if err = os.Rename(storePath, bakPath); err != nil {
+			panic(err)
+		}
+
+		// create new blockstore
+		var newDB dbm.DB
+		newDB, err = dbProvider(&DBContext{"blockstore", config})
+		if err != nil {
+			return
+		}
+		newBlockStore := bc.NewBlockStore(newDB)
+
+		// save blocks
+		for i := range blocks {
+			newBlockStore.SaveBlock(blocks[i].block, blocks[i].blockParts, blocks[i].seenCommit, false)
+		}
+
+		// remove old blockstore
+		if err = os.RemoveAll(bakPath); err != nil {
+			panic(err)
+		}
+
+		blockStore = newBlockStore
+	}
 
 	stateDB, err = dbProvider(&DBContext{"state", config})
 	if err != nil {
@@ -511,9 +569,10 @@ func NewNode(config *cfg.Config,
 	dbProvider DBProvider,
 	metricsProvider MetricsProvider,
 	logger log.Logger,
+	reapBlock bool,
 	options ...Option) (*Node, error) {
 
-	blockStore, stateDB, err := initDBs(config, dbProvider)
+	blockStore, stateDB, err := initDBs(config, dbProvider, reapBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +655,6 @@ func NewNode(config *cfg.Config,
 	// Make BlockchainReactor
 	bcReactor := bc.NewBlockchainReactor(state.Copy(), blockExec, blockStore, fastSync)
 	bcReactor.SetLogger(logger.With("module", "blockchain"))
-
 	// Make ConsensusReactor
 	consensusReactor, consensusState := createConsensusReactor(
 		config, state, blockExec, blockStore, mempool, evidencePool,
