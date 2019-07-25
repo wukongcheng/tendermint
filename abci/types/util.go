@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultEvent = "origin-tags"
+	DefaultEvent = "origin-tags"
 )
 
 //------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ func (v ValidatorUpdates) Swap(i, j int) {
 
 func GetTagByKey(events []Event, key string) (common.KVPair, bool) {
 	for _, event := range events {
-		if event.GetType() != defaultEvent {
+		if event.GetType() != DefaultEvent {
 			continue
 		}
 		for _, tag := range event.Attributes {
@@ -56,10 +56,10 @@ func GetTagByKey(events []Event, key string) (common.KVPair, bool) {
 
 func TagsToDefaultEvent(events []Event, tags ...common.KVPair) []Event {
 	if len(events) == 0 {
-		events = append(events, Event{Type: defaultEvent})
+		events = append(events, Event{Type: DefaultEvent})
 	}
 	for i, v := range events {
-		if v.Type == defaultEvent {
+		if v.Type == DefaultEvent {
 			events[i].Attributes = append(events[i].Attributes, tags...)
 		}
 	}
@@ -68,7 +68,7 @@ func TagsToDefaultEvent(events []Event, tags ...common.KVPair) []Event {
 
 func GetDefaultTags(events []Event) []common.KVPair {
 	for _, v := range events {
-		if v.Type == defaultEvent {
+		if v.Type == DefaultEvent {
 			pairs := make([]common.KVPair, len(v.Attributes))
 			copy(pairs, v.Attributes)
 			return pairs
