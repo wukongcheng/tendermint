@@ -69,6 +69,8 @@ type CListMempool struct {
 }
 
 var _ Mempool = &CListMempool{}
+var CliTx = 0
+var PeerTx = 0
 
 // CListMempoolOption sets an optional parameter on the mempool.
 type CListMempoolOption func(*CListMempool)
@@ -209,6 +211,7 @@ func (mem *CListMempool) TxsWaitChan() <-chan struct{} {
 //     It gets called from another goroutine.
 // CONTRACT: Either cb will get called, or err returned.
 func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
+	CliTx++
 	return mem.CheckTxWithInfo(tx, cb, TxInfo{SenderID: UnknownPeerID})
 }
 
@@ -467,6 +470,8 @@ func (mem *CListMempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 		time.Sleep(time.Millisecond * 10)
 	}
 
+	fmt.Printf("TM Propose mem.size(): %d \n", mem.Size())
+
 	var totalBytes int64
 	var totalGas int64
 	// TODO: we will get a performance boost if we have a good estimate of avg
@@ -534,6 +539,11 @@ func (mem *CListMempool) Update(
 		mem.postCheck = postCheck
 	}
 
+	fmt.Printf("TM CliTx: %d;  PeerTx: %d \n", CliTx, PeerTx)
+	fmt.Printf("TM Update txs/ mem.size() : %d \n", mem.Size())
+	CliTx = 0
+	PeerTx = 0
+
 	for i, tx := range txs {
 		if deliverTxResponses[i].Code == abci.CodeTypeOK {
 			// Add valid committed tx to the cache (if missing).
@@ -560,6 +570,7 @@ func (mem *CListMempool) Update(
 
 	// Either recheck non-committed txs to see if they became invalid
 	// or just notify there're some txs left.
+	fmt.Printf("TM recheck txs/ mem.size() : %d \n", mem.Size())
 	if mem.Size() > 0 {
 		if mem.config.Recheck {
 			mem.logger.Info("Recheck txs", "numtxs", mem.Size(), "height", height)

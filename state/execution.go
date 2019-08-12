@@ -211,6 +211,8 @@ func (blockExec *BlockExecutor) Commit(
 	blockExec.mempool.Lock()
 	defer blockExec.mempool.Unlock()
 
+	fmt.Printf("TM Commit/ devliverTx size: %d \n", len(deliverTxResponses))
+
 	// while mempool is Locked, flush to ensure all async requests have completed
 	// in the ABCI app before Commit.
 	err := blockExec.mempool.FlushAppConn()
