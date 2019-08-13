@@ -855,6 +855,7 @@ type RequestBeginBlock struct {
 	Header               Header         `protobuf:"bytes,2,opt,name=header" json:"header"`
 	LastCommitInfo       LastCommitInfo `protobuf:"bytes,3,opt,name=last_commit_info,json=lastCommitInfo" json:"last_commit_info"`
 	ByzantineValidators  []Evidence     `protobuf:"bytes,4,rep,name=byzantine_validators,json=byzantineValidators" json:"byzantine_validators"`
+	Txs                  [][]byte       `protobuf:"bytes,5,opt,name=txs,proto3" json:"txs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_unrecognized     []byte         `json:"-"`
 	XXX_sizecache        int32          `json:"-"`
