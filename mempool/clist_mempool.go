@@ -470,6 +470,7 @@ func (mem *CListMempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 		time.Sleep(time.Millisecond * 10)
 	}
 
+	fmt.Println("\n")
 	fmt.Printf("TM Propose mem.size(): %d \n", mem.Size())
 
 	var totalBytes int64
@@ -541,8 +542,6 @@ func (mem *CListMempool) Update(
 
 	fmt.Printf("TM CliTx: %d;  PeerTx: %d \n", CliTx, PeerTx)
 	fmt.Printf("TM Update txs/ mem.size() : %d \n", mem.Size())
-	CliTx = 0
-	PeerTx = 0
 
 	for i, tx := range txs {
 		if deliverTxResponses[i].Code == abci.CodeTypeOK {
@@ -570,7 +569,6 @@ func (mem *CListMempool) Update(
 
 	// Either recheck non-committed txs to see if they became invalid
 	// or just notify there're some txs left.
-	fmt.Printf("TM recheck txs/ mem.size() : %d \n", mem.Size())
 	if mem.Size() > 0 {
 		if mem.config.Recheck {
 			mem.logger.Info("Recheck txs", "numtxs", mem.Size(), "height", height)
@@ -585,6 +583,9 @@ func (mem *CListMempool) Update(
 
 	// Update metrics
 	mem.metrics.Size.Set(float64(mem.Size()))
+	fmt.Printf("TM after recheck txs/ mem.size() : %d \n", mem.Size())
+	CliTx = 0
+	PeerTx = 0
 
 	return nil
 }
