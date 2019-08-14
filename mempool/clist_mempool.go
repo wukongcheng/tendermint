@@ -69,8 +69,6 @@ type CListMempool struct {
 }
 
 var _ Mempool = &CListMempool{}
-var CliTx = 0
-var PeerTx = 0
 
 // CListMempoolOption sets an optional parameter on the mempool.
 type CListMempoolOption func(*CListMempool)
@@ -211,11 +209,10 @@ func (mem *CListMempool) TxsWaitChan() <-chan struct{} {
 //     It gets called from another goroutine.
 // CONTRACT: Either cb will get called, or err returned.
 func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
-	CliTx++
-	return mem.CheckTxWithInfo(tx, cb, TxInfo{SenderID: UnknownPeerID})
+	return mem.CheckTxWithInfo(tx, cb, TxInfo{SenderID: UnknownPeerID}, false)
 }
 
-func (mem *CListMempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo) (err error) {
+func (mem *CListMempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo, reactor bool) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
@@ -282,8 +279,24 @@ func (mem *CListMempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), t
 		return err
 	}
 
-	reqRes := mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{Tx: tx})
-	reqRes.SetCallback(mem.reqResCb(tx, txInfo.SenderID, cb))
+	if !reactor {
+		reqRes := mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{Tx: tx})
+		reqRes.SetCallback(mem.reqResCb(tx, txInfo.SenderID, cb))
+	} else {
+		memTx := &mempoolTx{
+			height:    mem.height,
+			gasWanted: 0,
+			tx:        tx,
+		}
+		memTx.senders.Store(txInfo.SenderID, true)
+		mem.addTx(memTx)
+		mem.logger.Debug("Added good transaction",
+			"tx", txID(tx),
+			"height", memTx.height,
+			"total", mem.Size(),
+		)
+		mem.notifyTxsAvailable()
+	}
 
 	return nil
 }
@@ -377,7 +390,7 @@ func (mem *CListMempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Resp
 			}
 			memTx.senders.Store(peerID, true)
 			mem.addTx(memTx)
-			mem.logger.Info("Added good transaction",
+			mem.logger.Debug("Added good transaction",
 				"tx", txID(tx),
 				"res", r,
 				"height", memTx.height,
@@ -470,8 +483,8 @@ func (mem *CListMempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	fmt.Println("\n")
-	fmt.Printf("TM Propose mem.size(): %d \n", mem.Size())
+	//fmt.Println("\n")
+	//fmt.Printf("TM Propose mem.size(): %d \n", mem.Size())
 
 	var totalBytes int64
 	var totalGas int64
@@ -540,8 +553,7 @@ func (mem *CListMempool) Update(
 		mem.postCheck = postCheck
 	}
 
-	fmt.Printf("TM CliTx: %d;  PeerTx: %d \n", CliTx, PeerTx)
-	fmt.Printf("TM Update txs/ mem.size() : %d \n", mem.Size())
+	//fmt.Printf("\n TM Update txs/ mem.size() : %d \n", mem.Size())
 
 	for i, tx := range txs {
 		if deliverTxResponses[i].Code == abci.CodeTypeOK {
@@ -583,9 +595,7 @@ func (mem *CListMempool) Update(
 
 	// Update metrics
 	mem.metrics.Size.Set(float64(mem.Size()))
-	fmt.Printf("TM after recheck txs/ mem.size() : %d \n", mem.Size())
-	CliTx = 0
-	PeerTx = 0
+	//fmt.Printf("TM after recheck txs/ mem.size() : %d \n", mem.Size())
 
 	return nil
 }
