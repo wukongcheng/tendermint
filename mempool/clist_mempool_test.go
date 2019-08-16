@@ -564,7 +564,7 @@ func TestMempoolRemoteAppConcurrency(t *testing.T) {
 		tx := txs[int(txNum)]
 
 		// this will err with ErrTxInCache many times ...
-		mempool.CheckTxWithInfo(tx, nil, TxInfo{SenderID: uint16(peerID)})
+		mempool.CheckTxWithInfo(tx, nil, TxInfo{SenderID: uint16(peerID)}, false)
 	}
 	err := mempool.FlushAppConn()
 	require.NoError(t, err)
