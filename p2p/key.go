@@ -31,7 +31,7 @@ type NodeKey struct {
 	PrivKey    crypto.PrivKey               `json:"priv_key"` // our priv key
 	RSAPrivKey string                       `json:"rsa_priv_key"`
 	RSAPubkKey string                       `json:"rsa_pub_key"`
-	OrgKeys    map[string]map[string]string `json:"org_keys"`
+	GroupKeys  map[string]map[string]string `json:"group_keys"`
 }
 
 // ID returns the peer's canonical ID - the hash of its public key.
