@@ -483,8 +483,7 @@ func (mem *CListMempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	//fmt.Println("\n")
-	//fmt.Printf("TM Propose mem.size(): %d \n", mem.Size())
+	mem.logger.Info(fmt.Sprintf("TM Propose mem.size(): %d \n", mem.Size()))
 
 	var totalBytes int64
 	var totalGas int64
@@ -595,7 +594,7 @@ func (mem *CListMempool) Update(
 
 	// Update metrics
 	mem.metrics.Size.Set(float64(mem.Size()))
-	//fmt.Printf("TM after recheck txs/ mem.size() : %d \n", mem.Size())
+	mem.logger.Info(fmt.Sprintf("TM after recheck txs/ mem.size() : %d \n", mem.Size()))
 
 	return nil
 }
