@@ -21,6 +21,10 @@ const (
 	UpgradeFailureTagKey = "upgrade_failure"
 )
 
+var (
+	tpsc = NewTPSCalculator(10)
+)
+
 //-----------------------------------------------------------------------------
 // BlockExecutor handles block execution and state updates.
 // It exposes ApplyBlock(), which validates & executes the block, updates state w/ ABCI responses,
@@ -231,10 +235,14 @@ func (blockExec *BlockExecutor) Commit(
 	}
 	// ResponseCommit has no error code - just data
 
+	tpsc.AddRecord(uint32(block.NumTxs))
+	tps := tpsc.TPS()
+
 	blockExec.logger.Info(
 		"Committed state",
 		"height", block.Height,
 		"txs", block.NumTxs,
+		"tps", tps,
 		"appHash", fmt.Sprintf("%X", res.Data),
 	)
 
