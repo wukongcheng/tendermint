@@ -629,14 +629,14 @@ type MempoolConfig struct {
 // DefaultMempoolConfig returns a default configuration for the Tendermint mempool
 func DefaultMempoolConfig() *MempoolConfig {
 	return &MempoolConfig{
-		Recheck:   true,
+		Recheck:   false,
 		Broadcast: true,
 		WalPath:   "",
 		// Each signature verification takes .5ms, Size reduced until we implement
 		// ABCI Recheck
-		Size:        5000,
+		Size:        20000,
 		MaxTxsBytes: 1024 * 1024 * 1024, // 1GB
-		CacheSize:   10000,
+		CacheSize:   20000,
 	}
 }
 
@@ -706,7 +706,7 @@ type ConsensusConfig struct {
 func DefaultConsensusConfig() *ConsensusConfig {
 	return &ConsensusConfig{
 		WalPath:                     filepath.Join(defaultDataDir, "cs.wal", "wal"),
-		TimeoutPropose:              3000 * time.Millisecond,
+		TimeoutPropose:              1000 * time.Millisecond,
 		TimeoutProposeDelta:         500 * time.Millisecond,
 		TimeoutPrevote:              1000 * time.Millisecond,
 		TimeoutPrevoteDelta:         500 * time.Millisecond,
