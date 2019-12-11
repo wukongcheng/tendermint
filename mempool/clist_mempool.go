@@ -69,6 +69,8 @@ type CListMempool struct {
 }
 
 var _ Mempool = &CListMempool{}
+var txNum = 0
+var cliNum = 0
 
 // CListMempoolOption sets an optional parameter on the mempool.
 type CListMempoolOption func(*CListMempool)
@@ -209,25 +211,11 @@ func (mem *CListMempool) TxsWaitChan() <-chan struct{} {
 //     It gets called from another goroutine.
 // CONTRACT: Either cb will get called, or err returned.
 func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
+	cliNum = cliNum + 1
 	return mem.CheckTxWithInfo(tx, cb, TxInfo{SenderID: UnknownPeerID}, false)
 }
 
 func (mem *CListMempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo, reactor bool) (err error) {
-	mem.proxyMtx.Lock()
-	// use defer to unlock mutex because application (*local client*) might panic
-	defer mem.proxyMtx.Unlock()
-
-	var (
-		memSize  = mem.Size()
-		txsBytes = mem.TxsBytes()
-	)
-	if memSize >= mem.config.Size ||
-		int64(len(tx))+txsBytes > mem.config.MaxTxsBytes {
-		return ErrMempoolIsFull{
-			memSize, mem.config.Size,
-			txsBytes, mem.config.MaxTxsBytes}
-	}
-
 	// The size of the corresponding amino-encoded TxMessage
 	// can't be larger than the maxMsgSize, otherwise we can't
 	// relay it to peers.
@@ -239,6 +227,21 @@ func (mem *CListMempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), t
 		if err := mem.preCheck(tx); err != nil {
 			return ErrPreCheck{err}
 		}
+	}
+
+	//mem.proxyMtx.Lock()
+	//// use defer to unlock mutex because application (*local client*) might panic
+	//defer mem.proxyMtx.Unlock()
+
+	var (
+		memSize  = mem.Size()
+		txsBytes = mem.TxsBytes()
+	)
+	if memSize >= mem.config.Size ||
+		int64(len(tx))+txsBytes > mem.config.MaxTxsBytes {
+		return ErrMempoolIsFull{
+			memSize, mem.config.Size,
+			txsBytes, mem.config.MaxTxsBytes}
 	}
 
 	// CACHE
@@ -345,6 +348,8 @@ func (mem *CListMempool) reqResCb(tx []byte, peerID uint16, externalCb func(*abc
 		if externalCb != nil {
 			externalCb(res)
 		}
+
+		txNum = txNum + 1
 	}
 }
 
@@ -475,6 +480,11 @@ func (mem *CListMempool) notifyTxsAvailable() {
 }
 
 func (mem *CListMempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
+	mem.logger.Info(fmt.Sprintf("TM got txs: %d", txNum))
+	mem.logger.Info(fmt.Sprintf("TM got cli: %d", cliNum))
+	txNum = 0
+	cliNum = 0
+
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
 
@@ -483,8 +493,7 @@ func (mem *CListMempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	//fmt.Println("\n")
-	//fmt.Printf("TM Propose mem.size(): %d \n", mem.Size())
+	mem.logger.Info(fmt.Sprintf("TM Propose mem.size(): %d \n", mem.Size()))
 
 	var totalBytes int64
 	var totalGas int64
@@ -595,7 +604,7 @@ func (mem *CListMempool) Update(
 
 	// Update metrics
 	mem.metrics.Size.Set(float64(mem.Size()))
-	//fmt.Printf("TM after recheck txs/ mem.size() : %d \n", mem.Size())
+	mem.logger.Info(fmt.Sprintf("TM after recheck txs/ mem.size() : %d \n", mem.Size()))
 
 	return nil
 }

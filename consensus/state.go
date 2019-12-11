@@ -1211,6 +1211,7 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 		cs.CommitTime = tmtime.Now()
 		cs.newStep()
 
+		logger.Info("TM CommitTime: ", time.Now().String())
 		// Maybe finalize immediately.
 		cs.tryFinalizeCommit(height)
 	}()
@@ -1344,6 +1345,8 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 		}
 		return
 	}
+
+	cs.Logger.Info("TM finish apply block: ", time.Now().String())
 
 	fail.Fail() // XXX
 

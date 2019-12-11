@@ -727,9 +727,12 @@ func (sw *Switch) filterPeer(p Peer) error {
 // addPeer starts up the Peer and adds it to the Switch. Error is returned if
 // the peer is filtered out or failed to start or can't be added.
 func (sw *Switch) addPeer(p Peer) error {
+	fmt.Println("Begin Add Peer:")
 	if err := sw.filterPeer(p); err != nil {
+		fmt.Println("Filter failed")
 		return err
 	}
+	fmt.Println("Filter succeed")
 
 	p.SetLogger(sw.Logger.With("peer", p.SocketAddr()))
 

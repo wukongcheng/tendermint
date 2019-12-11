@@ -132,6 +132,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block, blockExec.db)
 	endTime := time.Now().UnixNano()
 	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime-startTime) / 1000000)
+	blockExec.logger.Info(fmt.Sprintf("Block Processing Time: %f", float64(endTime-startTime) / 1000000))
 	if err != nil {
 		return state, ErrProxyAppConn(err)
 	}
@@ -306,6 +307,7 @@ func execBlockOnProxyApp(
 		return nil, err
 	}
 
+	startTime := time.Now().UnixNano()
 	// Run txs of block.
 	for _, tx := range block.Txs {
 		proxyAppConn.DeliverTxAsync(abci.RequestDeliverTx{Tx: tx})
@@ -313,6 +315,8 @@ func execBlockOnProxyApp(
 			return nil, err
 		}
 	}
+	endTime := time.Now().UnixNano()
+	logger.Info(fmt.Sprintf("Run txs of block Time: %f, len(Txs): %d", float64(endTime-startTime) / 1000000, len(block.Txs)))
 
 	// End block.
 	abciResponses.EndBlock, err = proxyAppConn.EndBlockSync(abci.RequestEndBlock{Height: block.Height})
