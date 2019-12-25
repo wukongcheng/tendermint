@@ -625,7 +625,7 @@ func (sw *Switch) acceptRoutine() {
 			continue
 		}
 
-		if err := sw.addPeer(p); err != nil {
+		if err := sw.addPeer(p, true); err != nil {
 			sw.transport.Cleanup(p)
 			if p.IsRunning() {
 				_ = p.Stop()
@@ -685,7 +685,7 @@ func (sw *Switch) addOutboundPeerWithConfig(
 		return err
 	}
 
-	if err := sw.addPeer(p); err != nil {
+	if err := sw.addPeer(p, false); err != nil {
 		sw.transport.Cleanup(p)
 		if p.IsRunning() {
 			_ = p.Stop()
@@ -726,9 +726,11 @@ func (sw *Switch) filterPeer(p Peer) error {
 
 // addPeer starts up the Peer and adds it to the Switch. Error is returned if
 // the peer is filtered out or failed to start or can't be added.
-func (sw *Switch) addPeer(p Peer) error {
-	if err := sw.filterPeer(p); err != nil {
-		return err
+func (sw *Switch) addPeer(p Peer, inBound bool) error {
+	if inBound {
+		if err := sw.filterPeer(p); err != nil {
+			return err
+		}
 	}
 
 	p.SetLogger(sw.Logger.With("peer", p.SocketAddr()))
