@@ -43,6 +43,10 @@ var (
 	msgQueueSize = 1000
 )
 
+var (
+	Switch *p2p.Switch
+)
+
 // msgs from the reactor which may update the state
 type msgInfo struct {
 	Msg    ConsensusMessage `json:"msg"`
@@ -1267,6 +1271,9 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 
 	//	go
 	cs.finalizeCommit(height)
+
+	// check if peer needs to be removed
+	Switch.CheckPeers()
 }
 
 // Increment height and goto cstypes.RoundStepNewHeight

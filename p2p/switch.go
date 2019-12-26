@@ -775,3 +775,26 @@ func (sw *Switch) addPeer(p Peer, inBound bool) error {
 
 	return nil
 }
+
+// check if peer needs to be removed
+func (sw *Switch) CheckPeers() {
+	for _, p := range sw.peers.List() {
+		errc := make(chan error, len(sw.peerFilters))
+
+		for _, f := range sw.peerFilters {
+			go func(f PeerFilterFunc, p Peer, errc chan<- error) {
+				errc <- f(sw.peers, p)
+			}(f, p, errc)
+		}
+
+		for i := 0; i < cap(errc); i++ {
+			select {
+			case err := <-errc:
+				if err != nil {
+					sw.StopPeerGracefully(p)
+					sw.addrBook.RemoveAddress(p.SocketAddr())
+				}
+			}
+		}
+	}
+}
