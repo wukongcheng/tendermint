@@ -791,6 +791,7 @@ func (sw *Switch) CheckPeers() {
 			select {
 			case err := <-errc:
 				if err != nil {
+					p.CloseConn()
 					sw.StopPeerGracefully(p)
 					sw.addrBook.RemoveAddress(p.SocketAddr())
 				}
