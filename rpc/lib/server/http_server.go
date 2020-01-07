@@ -40,7 +40,7 @@ func DefaultConfig() *Config {
 const (
 	// maxBodyBytes controls the maximum number of bytes the
 	// server will read parsing the request body.
-	maxBodyBytes = int64(1000000) // 1MB
+	maxBodyBytes = 32 << 20 // 32MB
 
 	// same as the net/http default
 	maxHeaderBytes = 1 << 20
