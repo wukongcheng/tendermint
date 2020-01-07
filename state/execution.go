@@ -210,6 +210,7 @@ func (blockExec *BlockExecutor) Commit(
 ) ([]byte, error) {
 	blockExec.mempool.Lock()
 	defer blockExec.mempool.Unlock()
+	//fmt.Printf("\n TM Commit/ devliverTx size: %d \n", len(deliverTxResponses))
 
 	// while mempool is Locked, flush to ensure all async requests have completed
 	// in the ABCI app before Commit.
@@ -289,11 +290,16 @@ func execBlockOnProxyApp(
 
 	// Begin block
 	var err error
+	txs := make([][]byte, len(block.Txs))
+	for i := range block.Txs {
+		txs[i] = block.Txs[i]
+	}
 	abciResponses.BeginBlock, err = proxyAppConn.BeginBlockSync(abci.RequestBeginBlock{
 		Hash:                block.Hash(),
 		Header:              types.TM2PB.Header(&block.Header),
 		LastCommitInfo:      commitInfo,
 		ByzantineValidators: byzVals,
+		Txs:                 txs,
 	})
 	if err != nil {
 		logger.Error("Error in proxyAppConn.BeginBlock", "err", err)

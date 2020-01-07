@@ -76,3 +76,12 @@ func GetDefaultTags(events []Event) []common.KVPair {
 	}
 	return nil
 }
+
+func GetAllTags(events []Event) (pairs []common.KVPair) {
+	for _, v := range events {
+		ps := make([]common.KVPair, len(v.Attributes))
+		copy(ps, v.Attributes)
+		pairs = append(pairs, ps...)
+	}
+	return pairs
+}

@@ -43,6 +43,10 @@ var (
 	msgQueueSize = 1000
 )
 
+var (
+	Switch *p2p.Switch
+)
+
 // msgs from the reactor which may update the state
 type msgInfo struct {
 	Msg    ConsensusMessage `json:"msg"`
@@ -136,7 +140,7 @@ type ConsensusState struct {
 	evsw tmevents.EventSwitch
 
 	// for reporting metrics
-	metrics *Metrics
+	metrics    *Metrics
 	Deprecated bool
 }
 
@@ -1267,6 +1271,9 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 
 	//	go
 	cs.finalizeCommit(height)
+
+	// check if peer needs to be removed
+	Switch.CheckPeers()
 }
 
 // Increment height and goto cstypes.RoundStepNewHeight
@@ -1304,7 +1311,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 		// but may differ from the LastCommit included in the next block
 		precommits := cs.Votes.Precommits(cs.CommitRound)
 		seenCommit := precommits.MakeCommit()
-		cs.blockStore.SaveBlock(block, blockParts, seenCommit)
+		cs.blockStore.SaveBlock(block, blockParts, seenCommit, true)
 	} else {
 		// Happens during replay if we already saved the block but didn't commit
 		cs.Logger.Info("Calling finalizeCommit on already stored block", "height", block.Height)
