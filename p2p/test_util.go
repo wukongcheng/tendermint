@@ -155,7 +155,7 @@ func (sw *Switch) addPeerWithConnection(conn net.Conn) error {
 		sw.StopPeerForError,
 	)
 
-	if err = sw.addPeer(p); err != nil {
+	if err = sw.addPeer(p, false); err != nil {
 		pc.CloseConn()
 		return err
 	}

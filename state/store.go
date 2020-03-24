@@ -66,6 +66,10 @@ func LoadStateFromDBOrGenesisDoc(stateDB dbm.DB, genesisDoc *types.GenesisDoc) (
 	return state, nil
 }
 
+func LoadPreState(db dbm.DB) State {
+	return loadState(db, statePreKey)
+}
+
 // LoadState loads the State from the database.
 func LoadState(db dbm.DB) State {
 	return loadState(db, stateKey)
@@ -89,6 +93,10 @@ func loadState(db dbm.DB, key []byte) (state State) {
 	// TODO: ensure that buf is completely read.
 
 	return state
+}
+
+func SavePreState(db dbm.DB, state State) {
+	saveState(db, state, statePreKey)
 }
 
 // SaveState persists the State, the ValidatorsInfo, and the ConsensusParamsInfo to the database.

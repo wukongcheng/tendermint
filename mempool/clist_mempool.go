@@ -211,6 +211,10 @@ func (mem *CListMempool) TxsWaitChan() <-chan struct{} {
 //     It gets called from another goroutine.
 // CONTRACT: Either cb will get called, or err returned.
 func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response), txInfo TxInfo) (err error) {
+	return mem.CheckTxWithInfo(tx, cb, TxInfo{SenderID: UnknownPeerID}, false)
+}
+
+func (mem *CListMempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo, reactor bool) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
@@ -278,8 +282,24 @@ func (mem *CListMempool) CheckTx(tx types.Tx, cb func(*abci.Response), txInfo Tx
 		return err
 	}
 
-	reqRes := mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{Tx: tx})
-	reqRes.SetCallback(mem.reqResCb(tx, txInfo.SenderID, txInfo.SenderP2PID, cb))
+	if !reactor {
+		reqRes := mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{Tx: tx})
+		reqRes.SetCallback(mem.reqResCb(tx, txInfo.SenderID, txInfo.SenderP2PID, cb))
+	} else {
+		memTx := &mempoolTx{
+			height:    mem.height,
+			gasWanted: 0,
+			tx:        tx,
+		}
+		memTx.senders.Store(txInfo.SenderID, true)
+		mem.addTx(memTx)
+		mem.logger.Debug("Added good transaction",
+			"tx", txID(tx),
+			"height", memTx.height,
+			"total", mem.Size(),
+		)
+		mem.notifyTxsAvailable()
+	}
 
 	return nil
 }
