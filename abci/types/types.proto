@@ -80,6 +80,7 @@ message RequestBeginBlock {
   Header            header               = 2 [(gogoproto.nullable) = false];
   LastCommitInfo    last_commit_info     = 3 [(gogoproto.nullable) = false];
   repeated Evidence byzantine_validators = 4 [(gogoproto.nullable) = false];
+  repeated bytes txs = 5;
 }
 
 enum CheckTxType {
@@ -186,10 +187,20 @@ message ResponseCheckTx {
   string codespace = 8;
 }
 
+message VMEvent {
+    bytes   address         = 1;
+    bytes   data            = 2;
+    repeated bytes topics   = 3;
+    uint64  block_number    = 4;
+    bytes   tx_hash         = 5;
+    bytes   block_hash      = 6;
+}
+
 message ResponseDeliverTx {
   uint32         code       = 1;
   bytes          data       = 2;
   string         log        = 3;  // nondeterministic
+  repeated VMEvent vmevents = 9;
   string         info       = 4;  // nondeterministic
   int64          gas_wanted = 5;
   int64          gas_used   = 6;

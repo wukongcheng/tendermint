@@ -160,6 +160,13 @@ type BaseConfig struct { //nolint: maligned
 	// and verifying their commits
 	FastSyncMode bool `mapstructure:"fast_sync"`
 
+	// If the blockchain is deprecated, run node with Deprecated will
+	// work in query only mode. Consensus engine and p2p gossip will be
+	// shutdown
+	Deprecated bool `mapstructure:"deprecated"`
+
+	ReplayHeight int64 `mapstructure:"replay_height"`
+
 	// Database backend: goleveldb | cleveldb | boltdb | rocksdb
 	// * goleveldb (github.com/syndtr/goleveldb - most popular implementation)
 	//   - pure go
@@ -211,7 +218,7 @@ type BaseConfig struct { //nolint: maligned
 
 	// If true, query the ABCI app on connecting to a new peer
 	// so the app can decide if we should keep the connection or not
-	FilterPeers bool `mapstructure:"filter_peers"` // false
+	// FilterPeers bool `mapstructure:"filter_peers"` // false
 }
 
 // DefaultBaseConfig returns a default base configuration for a Tendermint node
@@ -228,7 +235,9 @@ func DefaultBaseConfig() BaseConfig {
 		LogFormat:          LogFormatPlain,
 		ProfListenAddress:  "",
 		FastSyncMode:       true,
-		FilterPeers:        false,
+		//FilterPeers:        false,
+		Deprecated:         false,
+		ReplayHeight:       -1,
 		DBBackend:          "goleveldb",
 		DBPath:             "data",
 	}
@@ -660,14 +669,14 @@ type MempoolConfig struct {
 // DefaultMempoolConfig returns a default configuration for the Tendermint mempool
 func DefaultMempoolConfig() *MempoolConfig {
 	return &MempoolConfig{
-		Recheck:   true,
+		Recheck:   false,
 		Broadcast: true,
 		WalPath:   "",
 		// Each signature verification takes .5ms, Size reduced until we implement
 		// ABCI Recheck
-		Size:        5000,
+		Size:        20000,
 		MaxTxsBytes: 1024 * 1024 * 1024, // 1GB
-		CacheSize:   10000,
+		CacheSize:   20000,
 		MaxTxBytes:  1024 * 1024, // 1MB
 	}
 }
@@ -773,7 +782,7 @@ type ConsensusConfig struct {
 func DefaultConsensusConfig() *ConsensusConfig {
 	return &ConsensusConfig{
 		WalPath:                     filepath.Join(defaultDataDir, "cs.wal", "wal"),
-		TimeoutPropose:              3000 * time.Millisecond,
+		TimeoutPropose:              1000 * time.Millisecond,
 		TimeoutProposeDelta:         500 * time.Millisecond,
 		TimeoutPrevote:              1000 * time.Millisecond,
 		TimeoutPrevoteDelta:         500 * time.Millisecond,

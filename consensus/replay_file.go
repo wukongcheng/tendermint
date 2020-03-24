@@ -306,7 +306,7 @@ func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusCo
 
 	handshaker := NewHandshaker(stateDB, state, blockStore, gdoc)
 	handshaker.SetEventBus(eventBus)
-	err = handshaker.Handshake(proxyApp)
+	err = handshaker.Handshake(proxyApp, &config)
 	if err != nil {
 		tmos.Exit(fmt.Sprintf("Error on handshake: %v", err))
 	}
