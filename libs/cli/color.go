@@ -8,7 +8,6 @@ import (
 // Colors have been moved into iavl in TM official repo
 // This is a copy to satisfiy existed old caller
 // 2019.07.23
-
 const (
 	ANSIReset      = "\x1b[0m"
 	ANSIBright     = "\x1b[1m"
