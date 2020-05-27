@@ -19,7 +19,7 @@ type BlockStore interface {
 	LoadBlockMeta(height int64) *types.BlockMeta
 	LoadBlock(height int64) *types.Block
 
-	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit)
+	SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit, checkContiguous bool)
 
 	LoadBlockByHash(hash []byte) *types.Block
 	LoadBlockPart(height int64, index int) *types.Part

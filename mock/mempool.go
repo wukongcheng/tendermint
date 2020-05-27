@@ -40,3 +40,8 @@ func (Mempool) TxsWaitChan() <-chan struct{} { return nil }
 
 func (Mempool) InitWAL()  {}
 func (Mempool) CloseWAL() {}
+
+func (Mempool) CheckTxWithInfo(_ types.Tx, _ func(*abci.Response),
+	_ mempl.TxInfo, _ bool) error {
+	return nil
+}

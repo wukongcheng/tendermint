@@ -8,6 +8,7 @@ import (
 	"net/http"
 	_ "net/http/pprof" // nolint: gosec // securely exposed on separate, optional port
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/evidence"
 	"github.com/tendermint/tendermint/libs/log"
+	tmos "github.com/tendermint/tendermint/libs/os"
 	tmpubsub "github.com/tendermint/tendermint/libs/pubsub"
 	"github.com/tendermint/tendermint/libs/service"
 	mempl "github.com/tendermint/tendermint/mempool"
@@ -117,6 +119,7 @@ func DefaultNewNode(config *cfg.Config, logger log.Logger) (*Node, error) {
 		DefaultDBProvider,
 		DefaultMetricsProvider(config.Instrumentation),
 		logger,
+		false,
 	)
 }
 
@@ -202,13 +205,69 @@ type Node struct {
 	prometheusSrv    *http.Server
 }
 
-func initDBs(config *cfg.Config, dbProvider DBProvider) (blockStore *store.BlockStore, stateDB dbm.DB, err error) {
+func initDBs(config *cfg.Config, dbProvider DBProvider, reapNow bool) (blockStore *store.BlockStore, stateDB dbm.DB, err error) {
+	storePath := filepath.Join(config.DBDir(), "blockstore.db")
+	bakPath := filepath.Join(config.DBDir(), "blockstore_bak.db")
+
+	// maybe crashed last time
+	if tmos.FileExists(bakPath) {
+		if err = os.RemoveAll(storePath); err != nil {
+			panic(err)
+		}
+		if err = os.Rename(bakPath, storePath); err != nil {
+			panic(err)
+		}
+	}
+
 	var blockStoreDB dbm.DB
 	blockStoreDB, err = dbProvider(&DBContext{"blockstore", config})
 	if err != nil {
 		return
 	}
 	blockStore = store.NewBlockStore(blockStoreDB)
+
+	if reapNow && blockStore.Height() > 2 {
+		type unit struct {
+			block      *types.Block
+			blockParts *types.PartSet
+			seenCommit *types.Commit
+		}
+		var blocks [2]unit
+		for i := int64(0); i < 2; i++ {
+			height := blockStore.Height() - (1 - i)
+			var found bool
+			found, blocks[i].block, blocks[i].blockParts, blocks[i].seenCommit = blockStore.LoadWholeBlock(height)
+			if !found {
+				panic(fmt.Sprintf("cannot find block height %d", height))
+			}
+		}
+
+		// backup old blockstore
+		blockStoreDB.Close()
+		if err = os.Rename(storePath, bakPath); err != nil {
+			panic(err)
+		}
+
+		// create new blockstore
+		var newDB dbm.DB
+		newDB, err = dbProvider(&DBContext{"blockstore", config})
+		if err != nil {
+			return
+		}
+		newBlockStore := store.NewBlockStore(newDB)
+
+		// save blocks
+		for i := range blocks {
+			newBlockStore.SaveBlock(blocks[i].block, blocks[i].blockParts, blocks[i].seenCommit, false)
+		}
+
+		// remove old blockstore
+		if err = os.RemoveAll(bakPath); err != nil {
+			panic(err)
+		}
+
+		blockStore = newBlockStore
+	}
 
 	stateDB, err = dbProvider(&DBContext{"state", config})
 	if err != nil {
@@ -267,6 +326,7 @@ func createAndStartIndexerService(config *cfg.Config, dbProvider DBProvider,
 }
 
 func doHandshake(
+	config *cfg.Config,
 	stateDB dbm.DB,
 	state sm.State,
 	blockStore sm.BlockStore,
@@ -278,7 +338,7 @@ func doHandshake(
 	handshaker := cs.NewHandshaker(stateDB, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
-	if err := handshaker.Handshake(proxyApp); err != nil {
+	if err := handshaker.Handshake(proxyApp, &config.BaseConfig); err != nil {
 		return fmt.Errorf("error during handshake: %v", err)
 	}
 	return nil
@@ -428,43 +488,41 @@ func createTransport(
 
 	// Filter peers by addr or pubkey with an ABCI query.
 	// If the query return code is OK, add peer.
-	if config.FilterPeers {
-		connFilters = append(
-			connFilters,
-			// ABCI query for address filtering.
-			func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("error querying abci app: %v", res)
-				}
+	connFilters = append(
+		connFilters,
+		// ABCI query for address filtering.
+		func(_ p2p.ConnSet, c net.Conn, _ []net.IP) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/addr/%s", c.RemoteAddr().String()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
+			return nil
+		},
+	)
 
-		peerFilters = append(
-			peerFilters,
-			// ABCI query for ID filtering.
-			func(_ p2p.IPeerSet, p p2p.Peer) error {
-				res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
-					Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
-				})
-				if err != nil {
-					return err
-				}
-				if res.IsErr() {
-					return fmt.Errorf("error querying abci app: %v", res)
-				}
+	peerFilters = append(
+		peerFilters,
+		// ABCI query for ID filtering.
+		func(_ p2p.IPeerSet, p p2p.Peer) error {
+			res, err := proxyApp.Query().QuerySync(abci.RequestQuery{
+				Path: fmt.Sprintf("/p2p/filter/id/%s", p.ID()),
+			})
+			if err != nil {
+				return err
+			}
+			if res.IsErr() {
+				return fmt.Errorf("error querying abci app: %v", res)
+			}
 
-				return nil
-			},
-		)
-	}
+			return nil
+		},
+	)
 
 	p2p.MultiplexTransportConnFilters(connFilters...)(transport)
 	return transport, peerFilters
@@ -558,9 +616,10 @@ func NewNode(config *cfg.Config,
 	dbProvider DBProvider,
 	metricsProvider MetricsProvider,
 	logger log.Logger,
+	reapBlock bool,
 	options ...Option) (*Node, error) {
 
-	blockStore, stateDB, err := initDBs(config, dbProvider)
+	blockStore, stateDB, err := initDBs(config, dbProvider, reapBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +653,7 @@ func NewNode(config *cfg.Config,
 	// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 	// and replays any blocks as necessary to sync tendermint with the app.
 	consensusLogger := logger.With("module", "consensus")
-	if err := doHandshake(stateDB, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+	if err := doHandshake(config, stateDB, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
 		return nil, err
 	}
 
@@ -673,6 +732,7 @@ func NewNode(config *cfg.Config,
 		consensusReactor, evidenceReactor, nodeInfo, nodeKey, p2pLogger,
 	)
 
+	consensus.Switch = sw
 	err = sw.AddPersistentPeers(splitAndTrimEmpty(config.P2P.PersistentPeers, ",", " "))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not add peers from persistent_peers field")
@@ -770,6 +830,11 @@ func (n *Node) OnStart() error {
 	if n.config.Instrumentation.Prometheus &&
 		n.config.Instrumentation.PrometheusListenAddr != "" {
 		n.prometheusSrv = n.startPrometheusServer(n.config.Instrumentation.PrometheusListenAddr)
+	}
+
+	if n.consensusState.Deprecated || n.config.Deprecated {
+		n.Logger.Info("This blockchain was halt. The consensus engine and p2p gossip have been disabled. Only query rpc interfaces are available")
+		return nil
 	}
 
 	// Start the transport.
