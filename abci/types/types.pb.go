@@ -628,6 +628,7 @@ type RequestBeginBlock struct {
 	Header               Header         `protobuf:"bytes,2,opt,name=header,proto3" json:"header"`
 	LastCommitInfo       LastCommitInfo `protobuf:"bytes,3,opt,name=last_commit_info,json=lastCommitInfo,proto3" json:"last_commit_info"`
 	ByzantineValidators  []Evidence     `protobuf:"bytes,4,rep,name=byzantine_validators,json=byzantineValidators,proto3" json:"byzantine_validators"`
+	Txs                  [][]byte       `protobuf:"bytes,5,opt,name=txs,proto3" json:"txs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_unrecognized     []byte         `json:"-"`
 	XXX_sizecache        int32          `json:"-"`
@@ -1696,18 +1697,61 @@ func (m *ResponseCheckTx) GetCodespace() string {
 	return ""
 }
 
-type ResponseDeliverTx struct {
-	Code                 uint32   `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+// VMEvent begin ----------------------------------------------------------------------------------------------------
+
+type VMEvent struct {
+	Address              []byte   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
 	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Log                  string   `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`
-	Info                 string   `protobuf:"bytes,4,opt,name=info,proto3" json:"info,omitempty"`
-	GasWanted            int64    `protobuf:"varint,5,opt,name=gas_wanted,json=gasWanted,proto3" json:"gas_wanted,omitempty"`
-	GasUsed              int64    `protobuf:"varint,6,opt,name=gas_used,json=gasUsed,proto3" json:"gas_used,omitempty"`
-	Events               []Event  `protobuf:"bytes,7,rep,name=events,proto3" json:"events,omitempty"`
-	Codespace            string   `protobuf:"bytes,8,opt,name=codespace,proto3" json:"codespace,omitempty"`
+	Topics               [][]byte `protobuf:"bytes,3,rep,name=topics,proto3" json:"topics,omitempty"`
+	BlockNumber          uint64   `protobuf:"varint,4,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`
+	TxHash               []byte   `protobuf:"bytes,5,opt,name=tx_hash,json=txHash,proto3" json:"tx_hash,omitempty"`
+	BlockHash            []byte   `protobuf:"bytes,6,opt,name=block_hash,json=blockHash,proto3" json:"block_hash,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *VMEvent) Reset()         { *m = VMEvent{} }
+func (m *VMEvent) String() string { return proto.CompactTextString(m) }
+func (*VMEvent) ProtoMessage()    {}
+func (*VMEvent) Descriptor() ([]byte, []int) {
+	return fileDescriptor_9f1eaa49c51fa1ac, []int{0}
+}
+
+func (m *VMEvent) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_VMEvent.Unmarshal(m, b)
+}
+func (m *VMEvent) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_VMEvent.Marshal(b, m, deterministic)
+}
+func (m *VMEvent) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_VMEvent.Merge(m, src)
+}
+func (m *VMEvent) XXX_Size() int {
+	return xxx_messageInfo_VMEvent.Size(m)
+}
+func (m *VMEvent) XXX_DiscardUnknown() {
+	xxx_messageInfo_VMEvent.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_VMEvent proto.InternalMessageInfo
+
+// VMEvent end   ----------------------------------------------------------------------------------------------------
+
+
+type ResponseDeliverTx struct {
+	Code                 uint32    `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Data                 []byte    `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Log                  string    `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`
+	VMEvents             []VMEvent `protobuf:"bytes,9,opt,name=vmevents,proto3" json:"vmevents,omitempty"`
+	Info                 string    `protobuf:"bytes,4,opt,name=info,proto3" json:"info,omitempty"`
+	GasWanted            int64     `protobuf:"varint,5,opt,name=gas_wanted,json=gasWanted,proto3" json:"gas_wanted,omitempty"`
+	GasUsed              int64     `protobuf:"varint,6,opt,name=gas_used,json=gasUsed,proto3" json:"gas_used,omitempty"`
+	Events               []Event   `protobuf:"bytes,7,rep,name=events" json:"events,omitempty"`
+	Codespace            string    `protobuf:"bytes,8,opt,name=codespace,proto3" json:"codespace,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
 }
 
 func (m *ResponseDeliverTx) Reset()         { *m = ResponseDeliverTx{} }

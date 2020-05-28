@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/libs/kv"
 
 	dbm "github.com/tendermint/tm-db"
 
@@ -18,6 +19,13 @@ func validateBlock(evidencePool EvidencePool, stateDB dbm.DB, state State, block
 	// Validate internal consistency.
 	if err := block.ValidateBasic(); err != nil {
 		return err
+	}
+
+	if block.Version.Block != state.Version.Consensus.Block {
+		return fmt.Errorf("Wrong Block.Header.Version.Block Expected %v, got %v",
+			state.Version.Consensus.Block,
+			block.Version.Block,
+		)
 	}
 
 	// Validate basic info.
@@ -55,16 +63,13 @@ func validateBlock(evidencePool EvidencePool, stateDB dbm.DB, state State, block
 			block.AppHash,
 		)
 	}
+
+	VerifyShardingHash(state, block)
+
 	if !bytes.Equal(block.ConsensusHash, state.ConsensusParams.Hash()) {
 		return fmt.Errorf("wrong Block.Header.ConsensusHash.  Expected %X, got %v",
 			state.ConsensusParams.Hash(),
 			block.ConsensusHash,
-		)
-	}
-	if !bytes.Equal(block.LastResultsHash, state.LastResultsHash) {
-		return fmt.Errorf("wrong Block.Header.LastResultsHash.  Expected %X, got %v",
-			state.LastResultsHash,
-			block.LastResultsHash,
 		)
 	}
 	if !bytes.Equal(block.ValidatorsHash, state.Validators.Hash()) {
@@ -200,5 +205,41 @@ func VerifyEvidence(stateDB dbm.DB, state State, evidence types.Evidence) error 
 		return err
 	}
 
+	return nil
+}
+
+func CheckAppHashAndShardingHash(state State, ci types.CommitID) error {
+	if !bytes.Equal(state.AppHash, ci.Hash) {
+		panic(fmt.Errorf("Tendermint state.AppHash does not match AppHash after replay. Got %X, expected %X", ci.Hash, state.AppHash).Error())
+	}
+
+	shm := make(map[string][]byte)
+	for _, pair := range state.ShardingHash {
+		shm[string(pair.Key)] = pair.Value
+	}
+	for _, pair := range ci.ShardingHash {
+		if hash, ok := shm[string(pair.Key)]; ok {
+			if !bytes.Equal(hash, pair.Value) {
+				panic(fmt.Errorf("Tendermint state.ShardingHash does not match ShardingHash for sharding %s after replay. Got %X, expected %X", string(pair.Key), hash, pair.Value).Error())
+			}
+		}
+	}
+	return nil
+}
+
+func VerifyShardingHash(state State, block *types.Block) error {
+	kvs := kv.KVPairsFromString(block.ShardingHash)
+
+	shm := make(map[string][]byte)
+	for _, pair := range state.ShardingHash {
+		shm[string(pair.Key)] = pair.Value
+	}
+	for _, pair := range kvs {
+		if hash, ok := shm[string(pair.Key)]; ok {
+			if !bytes.Equal(hash, pair.Value) {
+				panic(fmt.Errorf("Tendermint state.ShardingHash does not match ShardingHash for sharding %s. Got %X, expected %X", string(pair.Key), hash, pair.Value).Error())
+			}
+		}
+	}
 	return nil
 }

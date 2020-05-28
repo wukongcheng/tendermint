@@ -667,7 +667,7 @@ func (sw *Switch) acceptRoutine() {
 
 		}
 
-		if err := sw.addPeer(p); err != nil {
+		if err := sw.addPeer(p, true); err != nil {
 			sw.transport.Cleanup(p)
 			if p.IsRunning() {
 				_ = p.Stop()
@@ -726,7 +726,7 @@ func (sw *Switch) addOutboundPeerWithConfig(
 		return err
 	}
 
-	if err := sw.addPeer(p); err != nil {
+	if err := sw.addPeer(p, false); err != nil {
 		sw.transport.Cleanup(p)
 		if p.IsRunning() {
 			_ = p.Stop()
@@ -767,9 +767,11 @@ func (sw *Switch) filterPeer(p Peer) error {
 
 // addPeer starts up the Peer and adds it to the Switch. Error is returned if
 // the peer is filtered out or failed to start or can't be added.
-func (sw *Switch) addPeer(p Peer) error {
-	if err := sw.filterPeer(p); err != nil {
-		return err
+func (sw *Switch) addPeer(p Peer, inBound bool) error {
+	if inBound {
+		if err := sw.filterPeer(p); err != nil {
+			return err
+		}
 	}
 
 	p.SetLogger(sw.Logger.With("peer", p.SocketAddr()))
@@ -813,4 +815,28 @@ func (sw *Switch) addPeer(p Peer) error {
 	sw.Logger.Info("Added peer", "peer", p)
 
 	return nil
+}
+
+// check if peer needs to be removed
+func (sw *Switch) CheckPeers() {
+	for _, p := range sw.peers.List() {
+		errc := make(chan error, len(sw.peerFilters))
+
+		for _, f := range sw.peerFilters {
+			go func(f PeerFilterFunc, p Peer, errc chan<- error) {
+				errc <- f(sw.peers, p)
+			}(f, p, errc)
+		}
+
+		for i := 0; i < cap(errc); i++ {
+			select {
+			case err := <-errc:
+				if err != nil {
+					p.CloseConn()
+					sw.StopPeerGracefully(p)
+					sw.addrBook.RemoveAddress(p.SocketAddr())
+				}
+			}
+		}
+	}
 }

@@ -434,7 +434,7 @@ func (bcR *BlockchainReactor) processBlock() error {
 		return errBlockVerificationFailure
 	}
 
-	bcR.store.SaveBlock(first, firstParts, second.LastCommit)
+	bcR.store.SaveBlock(first, firstParts, second.LastCommit, true)
 
 	bcR.state, _, err = bcR.blockExec.ApplyBlock(bcR.state, firstID, first)
 	if err != nil {

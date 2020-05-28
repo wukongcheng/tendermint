@@ -39,6 +39,9 @@ func AddNodeFlags(cmd *cobra.Command) {
 		[]byte{},
 		"Optional SHA-256 hash of the genesis file")
 
+	cmd.Flags().Bool("deprecated", config.Deprecated, "Mark blockchain as deprecated")
+	cmd.Flags().Int64("replay_height", config.ReplayHeight, "Specify which height to replay to, this is useful for exporting at any height")
+
 	// abci flags
 	cmd.Flags().String(
 		"proxy_app",

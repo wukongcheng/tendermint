@@ -236,7 +236,7 @@ func TestSwitchPeerFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = sw.addPeer(p)
+	err = sw.addPeer(p, false)
 	if err, ok := err.(ErrRejected); ok {
 		if !err.IsFiltered() {
 			t.Errorf("expected peer to be filtered")
@@ -281,7 +281,7 @@ func TestSwitchPeerFilterTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = sw.addPeer(p)
+	err = sw.addPeer(p, false)
 	if _, ok := err.(ErrFilterTimeout); !ok {
 		t.Errorf("expected ErrFilterTimeout")
 	}
@@ -307,11 +307,11 @@ func TestSwitchPeerFilterDuplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := sw.addPeer(p); err != nil {
+	if err := sw.addPeer(p, false); err != nil {
 		t.Fatal(err)
 	}
 
-	err = sw.addPeer(p)
+	err = sw.addPeer(p, false)
 	if errRej, ok := err.(ErrRejected); ok {
 		if !errRej.IsDuplicate() {
 			t.Errorf("expected peer to be duplicate. got %v", errRej)
@@ -351,7 +351,7 @@ func TestSwitchStopsNonPersistentPeerOnError(t *testing.T) {
 	})
 	require.Nil(err)
 
-	err = sw.addPeer(p)
+	err = sw.addPeer(p, false)
 	require.Nil(err)
 
 	require.NotNil(sw.Peers().Get(rp.ID()))
