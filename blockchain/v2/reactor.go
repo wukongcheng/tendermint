@@ -120,7 +120,7 @@ func (m *bcStatusResponseMessage) String() string {
 
 type blockStore interface {
 	LoadBlock(height int64) *types.Block
-	SaveBlock(*types.Block, *types.PartSet, *types.Commit)
+	SaveBlock(*types.Block, *types.PartSet, *types.Commit, bool)
 	Base() int64
 	Height() int64
 }

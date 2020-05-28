@@ -43,7 +43,7 @@ func (pc pContext) verifyCommit(chainID string, blockID types.BlockID, height in
 }
 
 func (pc *pContext) saveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit) {
-	pc.store.SaveBlock(block, blockParts, seenCommit)
+	pc.store.SaveBlock(block, blockParts, seenCommit, false)
 }
 
 type mockPContext struct {
