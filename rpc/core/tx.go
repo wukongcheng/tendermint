@@ -104,7 +104,8 @@ func TxSearch(ctx *rpctypes.Context, query string, prove bool, page, perPage int
 
 	apiResults := make([]*ctypes.ResultTx, 0, pageSize)
 	for i := skipCount; i < skipCount+pageSize; i++ {
-		r := results[i]
+		// show transactions in the latest-first order
+		r := results[totalCount-1-i]
 
 		var proof types.TxProof
 		if prove {

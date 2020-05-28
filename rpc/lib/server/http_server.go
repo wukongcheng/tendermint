@@ -39,7 +39,7 @@ func DefaultConfig() *Config {
 		MaxOpenConnections: 0, // unlimited
 		ReadTimeout:        10 * time.Second,
 		WriteTimeout:       10 * time.Second,
-		MaxBodyBytes:       int64(1000000), // 1MB
+		MaxBodyBytes:       32 << 20, 		// 32MB
 		MaxHeaderBytes:     1 << 20,        // same as the net/http default
 	}
 }

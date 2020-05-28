@@ -73,6 +73,41 @@ func (bs *BlockStore) Size() int64 {
 	return bs.height - bs.base + 1
 }
 
+// LoadBlockData returns all the block datas with the given height.
+// If no block is found for that height, it returns false.
+func (bs *BlockStore) LoadWholeBlock(height int64) (found bool, block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit) {
+	// load block meta
+	var blockMeta = bs.LoadBlockMeta(height)
+	if blockMeta == nil {
+		found = false
+		return
+	}
+
+	// build partset
+	blockParts = types.NewPartSetFromHeader(blockMeta.BlockID.PartsHeader)
+
+	// load block
+	block = new(types.Block)
+	buf := []byte{}
+	for i := 0; i < blockMeta.BlockID.PartsHeader.Total; i++ {
+		part := bs.LoadBlockPart(height, i)
+		buf = append(buf, part.Bytes...)
+
+		blockParts.AddPart(part)
+	}
+	err := cdc.UnmarshalBinaryLengthPrefixed(buf, block)
+	if err != nil {
+		// NOTE: The existence of meta should imply the existence of the
+		// block. So, make sure meta is only saved after blocks are saved.
+		panic(errors.Wrap(err, "Error reading block"))
+	}
+
+	seenCommit = bs.LoadSeenCommit(height)
+
+	found = true
+	return
+}
+
 // LoadBlock returns the block with the given height.
 // If no block is found for that height, it returns nil.
 func (bs *BlockStore) LoadBlock(height int64) *types.Block {
@@ -267,7 +302,7 @@ func (bs *BlockStore) PruneBlocks(height int64) (uint64, error) {
 //             If all the nodes restart after committing a block,
 //             we need this to reload the precommits to catch-up nodes to the
 //             most recent height.  Otherwise they'd stall at H-1.
-func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit) {
+func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, seenCommit *types.Commit, checkContiguous bool) {
 	if block == nil {
 		panic("BlockStore can only save a non-nil block")
 	}
@@ -275,7 +310,7 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 	height := block.Height
 	hash := block.Hash()
 
-	if g, w := height, bs.Height()+1; bs.Base() > 0 && g != w {
+	if g, w := height, bs.Height()+1; bs.Base() > 0 && checkContiguous && g != w {
 		panic(fmt.Sprintf("BlockStore can only save contiguous blocks. Wanted %v, got %v", w, g))
 	}
 	if !blockParts.IsComplete() {
@@ -291,7 +326,7 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 	// Save block parts
 	for i := 0; i < blockParts.Total(); i++ {
 		part := blockParts.GetPart(i)
-		bs.saveBlockPart(height, i, part)
+		bs.saveBlockPart(height, i, part, checkContiguous)
 	}
 
 	// Save block commit (duplicate and separate from the Block)
@@ -302,6 +337,9 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 	// NOTE: we can delete this at a later height
 	seenCommitBytes := cdc.MustMarshalBinaryBare(seenCommit)
 	bs.db.Set(calcSeenCommitKey(height), seenCommitBytes)
+
+	// Save new BlockStoreStateJSON descriptor
+	BlockStoreStateJSON{Height: height}.Save(bs.db)
 
 	// Done!
 	bs.mtx.Lock()
@@ -318,7 +356,24 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 	bs.db.SetSync(nil, nil)
 }
 
-func (bs *BlockStore) saveBlockPart(height int64, index int, part *types.Part) {
+func (bs *BlockStore) RetreatLastBlock() {
+	height := bs.height
+	bs.db.Delete(calcBlockMetaKey(height))
+	bs.db.Delete(calcBlockCommitKey(height - 1))
+	bs.db.Delete(calcSeenCommitKey(height))
+	BlockStoreStateJSON{Height: height - 1}.Save(bs.db)
+	// Done!
+	bs.mtx.Lock()
+	bs.height = height
+	bs.mtx.Unlock()
+	// Flush
+	bs.db.SetSync(nil, nil)
+}
+
+func (bs *BlockStore) saveBlockPart(height int64, index int, part *types.Part, checkContiguous bool) {
+	if checkContiguous && height != bs.Height()+1 {
+		panic(fmt.Sprintf("BlockStore can only save contiguous blocks. Wanted %v, got %v", bs.Height()+1, height))
+	}
 	partBytes := cdc.MustMarshalBinaryBare(part)
 	bs.db.Set(calcBlockPartKey(height, index), partBytes)
 }
